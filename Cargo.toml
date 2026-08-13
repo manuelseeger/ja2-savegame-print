@@ -1,0 +1,21 @@
+[package]
+name = "ja2-savegame"
+version = "0.1.0"
+edition = "2021"
+description = "Inspect Jagged Alliance 2 Stracciatella save games"
+license = "MIT"
+repository = "https://github.com/manuelseeger/ja2-savegame-print"
+
+[lib]
+name = "ja2_savegame"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ja2-savegame"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
