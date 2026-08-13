@@ -27,6 +27,9 @@ cargo build --release
 
 The implementation uses only portable Rust and accepts platform-native paths.
 
+Prebuilt Linux x86_64 and Windows x86_64 binaries are also attached to each
+[GitHub release](https://github.com/manuelseeger/ja2-savegame-print/releases).
+
 ## Usage
 
 ```sh
@@ -103,3 +106,16 @@ cargo test --all-features
 
 The fixture integration tests parse each save independently and do not assert
 hard-coded NPC locations.
+
+## Publishing a release
+
+Push a tag containing exactly `MAJOR.MINOR.PATCH` (without a `v` prefix):
+
+```sh
+git tag 1.2.3
+git push origin 1.2.3
+```
+
+The release workflow builds Linux x86_64 and Windows x86_64 binaries, creates a
+GitHub release named after the tag with generated release notes, and attaches
+both binaries.
