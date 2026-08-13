@@ -1,102 +1,141 @@
 # JA2 Stracciatella Savegame Analyzer
 
-`ja2-savegame` is a standalone, read-only Rust CLI for inspecting NPC strategic
-locations in Jagged Alliance 2 Stracciatella `.sav` files. It parses the save
-container and all 170 saved merc profiles directly; JA2 does not need to be
-installed or launched at runtime.
+`ja2-savegame` is a standalone, read-only command-line tool that shows the
+strategic locations of NPCs in Jagged Alliance 2 Stracciatella savegames. It
+reads `.sav` files directly; JA2 does not need to be installed or running.
 
-## Build
+## Download
 
-Rust stable is required.
+Download the latest binary from the
+[GitHub releases page](https://github.com/manuelseeger/ja2-savegame-print/releases/latest):
+
+- **Linux x86_64:** `ja2-savegame-linux-x86_64`
+- **Windows x86_64:** `ja2-savegame-windows-x86_64.exe`
+
+On Linux, make the downloaded file executable and optionally rename it:
+
+```sh
+chmod +x ja2-savegame-linux-x86_64
+mv ja2-savegame-linux-x86_64 ja2-savegame
+```
+
+## Usage
+
+Inspect one savegame:
 
 ### Linux
 
 ```sh
-cargo build --release
-./target/release/ja2-savegame inspect file.sav
+./ja2-savegame inspect /path/to/savegame.sav
 ```
 
-### Windows 10/11 (PowerShell)
-
-Install Rust with [rustup](https://rustup.rs/), then run:
+### Windows (PowerShell)
 
 ```powershell
-cargo build --release
-.\target\release\ja2-savegame.exe inspect C:\Games\JA2\SavedGames\file.sav
+.\ja2-savegame-windows-x86_64.exe inspect C:\path\to\savegame.sav
 ```
 
-The implementation uses only portable Rust and accepts platform-native paths.
+The default output contains stock NPCs and RPCs that have a meaningful saved
+strategic location. Surface sectors use JA2 notation such as `O4`; underground
+sectors include their depth, such as `A9-2`. Raw coordinates are shown as well.
 
-Prebuilt Linux x86_64 and Windows x86_64 binaries are also attached to each
-[GitHub release](https://github.com/manuelseeger/ja2-savegame-print/releases).
-
-## Usage
+### Options
 
 ```sh
-ja2-savegame inspect file.sav
+# Show selected NPCs (repeatable, case-insensitive)
+ja2-savegame inspect file.sav --npc Hamous --npc Skyrider
+
+# --include-npc is the long form of --npc
+ja2-savegame inspect file.sav --include-npc Devin
+
+# Exclusions take precedence over inclusions
+ja2-savegame inspect file.sav --exclude-npc Carmen
+
+# Include all 170 profiles, including unmapped or unplaced profiles
+ja2-savegame inspect file.sav --all-profiles
+
+# Machine-readable output
 ja2-savegame inspect file.sav --json
 ja2-savegame inspect file.sav --json --pretty
-ja2-savegame inspect file.sav --npc Hamous --npc Skyrider
-ja2-savegame inspect file.sav --include-npc Devin --exclude-npc Hamous
-ja2-savegame inspect file.sav --all-profiles
+
+# Show parsed section offsets on stderr
+ja2-savegame inspect file.sav -v
 ja2-savegame inspect file.sav -vv
+
+# Print the pinned Stracciatella source revision
 ja2-savegame --source-version
 ```
 
-Every invocation of `inspect` accepts exactly one save path. `--npc` is an
-alias for repeatable `--include-npc`; matching is case-insensitive against the
-stock canonical name and the saved full name and nickname. Exclusions take
-precedence. By default, output contains source-classified stock NPC/RPC
-profiles with a meaningful saved sector. `--all-profiles` exposes every parsed
-profile, including unmapped and unplaced entries; name filters still apply.
+Each `inspect` invocation accepts exactly one save file. Name filters match the
+stock canonical name, saved full name, and saved nickname.
 
-Surface sectors use standard notation (`x=15,y=4,z=0` is `O4`). Underground
-levels append depth (`A9-2`). JSON always retains raw `x`, `y`, and `z`; invalid
-or sentinel coordinates have no `name` field and are never converted to a
-valid sector. Profile output also reports whether the saved fields indicate
-placed, not currently placed, dead, unavailable, recruited, or unknown state.
-A saved valid sector is strategic state, not proof that an NPC is currently
-spawned in a loaded tactical map.
+## Supported savegames
 
-Debug output from `-v`/`-vv` goes to stderr, so JSON on stdout remains valid.
+The tool deliberately supports only normal portable **English-edition**
+Stracciatella save format versions **102 and 103**.
 
-## Supported format
+It does not support:
 
-The parser deliberately supports only normal portable **English-edition**
-Stracciatella save format versions **102 and 103**. It rejects version 101 and
-older, unknown future versions, malformed data, and recognizable legacy
-688-byte Stracciatella Linux headers. German-edition encoding, German language
-auto-detection, JA2 1.13, arbitrary mod-defined layouts, and historical save
-formats are not supported. An unsupported German save can therefore appear as
-a profile decoding/checksum failure.
+- save format version 101 or older
+- unknown future save versions
+- legacy 688-byte Stracciatella Linux saves
+- German-edition save encoding
+- JA2 1.13 saves
+- arbitrary mod-defined save layouts
 
-The binary-format reference is pinned to JA2 Stracciatella commit (confirmed as
-the intended upstream `master` review target during implementation):
+Malformed and unsupported files are rejected with an error rather than parsed
+heuristically. An unsupported German save may be reported as a profile
+decoding or checksum failure because the header does not reliably identify the
+edition.
+
+A valid saved sector is strategic state; it does not necessarily prove that an
+NPC is currently spawned in a loaded tactical map. Output distinguishes states
+such as placed, not currently placed, dead, unavailable, and recruited where
+the persisted profile fields permit it.
+
+## Known limitations
+
+- Stock NPC/RPC classification comes from Stracciatella's stock profile
+  metadata. Unknown or modded profile IDs are not classified as stock NPCs;
+  use `--all-profiles` to inspect them.
+- Saved names and nicknames are used for display because the original stock
+  display strings come from the licensed game data.
+- Parsing intentionally stops after all merc profiles have been structurally
+  decoded and checksum-validated. Later save sections are unnecessary for NPC
+  location analysis.
+
+## Format reference
+
+The binary format and stock profile mapping are pinned to JA2 Stracciatella
+commit:
 
 ```text
 dcc20b3c24b3e49ccd16e9d4ae87dcd20b9e51ea
 ```
 
-`--source-version` prints that pin. Important constants are traced in code to
-`SaveLoadGame.cc`, `Laptop.cc`, `LoadSaveMercProfile.cc`, and
-`Tactical_Save.cc`. The bundled 228 save-obfuscation rotation rows and stock
-NPC/RPC table were derived from that exact source and record the source-file
-SHA-256 hashes.
+Important constants were derived from `SaveLoadGame.cc`, `Laptop.cc`,
+`LoadSaveMercProfile.cc`, `Tactical_Save.cc`, and
+`assets/externalized/mercs-profile-info.json` at that revision. The bundled
+save-obfuscation table and NPC/RPC mapping record their source-file SHA-256
+hashes.
 
-## Known limitations
+## Build from source
 
-* Stock NPC/RPC eligibility comes from pinned
-  `assets/externalized/mercs-profile-info.json`. A modded or unknown profile ID
-  is not silently classified as a stock NPC; use `--all-profiles` to see it.
-* Saved names and nicknames remain the primary display values because stock
-  display strings originate in licensed `prof.dat`, not the source metadata.
-* Parsing intentionally stops after structurally decoding and checksum-checking
-  all merc profiles. Later save sections are not needed for location analysis.
-* No attempt is made to infer whether a strategically placed profile is
-  tactically spawned beyond the status and placement fields persisted in
-  `MERCPROFILESTRUCT`.
+Install a stable Rust toolchain with [rustup](https://rustup.rs/), clone this
+repository, and run:
+
+```sh
+cargo build --release --locked
+```
+
+The resulting executable is:
+
+- Linux: `target/release/ja2-savegame`
+- Windows: `target\release\ja2-savegame.exe`
 
 ## Development
+
+Run all project checks with:
 
 ```sh
 cargo fmt --check
@@ -104,18 +143,18 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test --all-features
 ```
 
-The fixture integration tests parse each save independently and do not assert
-hard-coded NPC locations.
+CI runs these checks on Linux and Windows. Fixture tests parse each save
+independently and do not assert hard-coded NPC locations.
 
 ## Publishing a release
 
-Push a tag containing exactly `MAJOR.MINOR.PATCH` (without a `v` prefix):
+Push a tag containing exactly `MAJOR.MINOR.PATCH`, without a `v` prefix:
 
 ```sh
 git tag 1.2.3
 git push origin 1.2.3
 ```
 
-The release workflow builds Linux x86_64 and Windows x86_64 binaries, creates a
-GitHub release named after the tag with generated release notes, and attaches
-both binaries.
+GitHub Actions builds Linux x86_64 and Windows x86_64 binaries, creates a
+release named after the tag with generated release notes, and attaches both
+binaries.
