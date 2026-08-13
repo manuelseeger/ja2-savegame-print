@@ -1,16 +1,16 @@
-# JA2 Stracciatella Replay/Save Analyzer
+# JA2 Stracciatella Savegame Analyzer
 
 ## 1. Objective
 
 Build a standalone Rust command-line tool that analyzes Jagged Alliance 2 Stracciatella `.sav` files.
 
-These files may be referred to by the user as **replays**, but they are JA2/Stracciatella saved-game files rather than an event-stream replay format.
+These files are JA2/Stracciatella saved-game files rather than event-stream formats.
 
-The primary purpose is to inspect RNG-dependent game state without launching JA2.
+The primary purpose is to inspect NPC strategic locations without launching JA2.
 
 ### Primary requirement
 
-For each supplied `.sav` file, output the current strategic locations of NPCs.
+For the single supplied `.sav` file, output the current strategic locations of NPCs.
 
 At minimum, support named NPCs whose locations are stored in `MERCPROFILESTRUCT`, including examples such as:
 
@@ -21,20 +21,18 @@ At minimum, support named NPCs whose locations are stored in `MERCPROFILESTRUCT`
 - Micky
 - Gabby
 
-Do not hard-code this list as the only supported NPCs. Ideally output all profiles representing non-player NPCs for which a meaningful location exists.
+Do not hard-code this list as the only supported NPCs. Output all stock profiles classified as NPC or RPC by the supported Stracciatella content for which a meaningful location exists. `--all-profiles` must still expose every parsed profile, including profiles whose NPC type cannot be determined.
 
-### Secondary requirement
+### Supported scope
 
-Extract as much useful RNG state as is serialized in the save, especially:
+The initial implementation targets only the normal portable **English-language** save format used by the latest Stracciatella releases/source:
 
-- save-header random value
-- `guiPreRandomIndex`
-- all 256 `guiPreRandomNums`
-- any other serialized RNG state discoverable in current Stracciatella saves
+- save format version 102, represented by the supplied fixture and the latest release line
+- save format version 103, used by current Stracciatella source at the pinned review commit
 
-The tool does **not** need to reconstruct historical RNG calls that are not present in the save.
+The authoritative source review is pinned to commit `dcc20b3c24b3e49ccd16e9d4ae87dcd20b9e51ea`. Reconfirm that this is still the intended latest source before implementation; if the target changes, update this specification and its supported-version list explicitly rather than silently widening compatibility.
 
----
+This narrow two-version target does not imply general backward compatibility. Older save versions, the legacy Stracciatella Linux format, German-edition encoding, JA2 1.13, and arbitrary mod-defined save formats are explicitly unsupported. Unsupported inputs must fail clearly rather than being parsed heuristically.
 
 # 2. Authoritative Reference Implementation
 
@@ -48,7 +46,9 @@ https://github.com/ja2-stracciatella/ja2-stracciatella
 
 Do not infer binary layouts from one supplied save if the corresponding Stracciatella serialization/deserialization code exists.
 
-The implementation should inspect the repository source directly while being built.
+The implementation should inspect the repository source directly while being built. Use commit `dcc20b3c24b3e49ccd16e9d4ae87dcd20b9e51ea` as the pinned format specification unless the supported latest-source target is explicitly updated first. Record the resulting pin in the code and README, and expose it through `--source-version`.
+
+Only the English edition's current save behavior is authoritative for this implementation. Do not add German-edition encryption-set calculation or language auto-detection.
 
 Particularly important files/symbols are listed below.
 
@@ -79,8 +79,6 @@ SaveMercProfiles
 LoadMercProfiles
 SaveSoldierStructure
 SaveNPCInfoToSaveGameFile
-SavePreRandomNumbersToSaveGameFile
-LoadPreRandomNumbersFromSaveGameFile
 NewJA2EncryptedFileWrite
 NewJA2EncryptedFileRead
 ```
@@ -105,20 +103,9 @@ Stracciatella source defines:
 SAVED_GAME_HEADER::ON_DISK_SIZE = 432
 ```
 
-There is also an old Stracciatella Linux format:
+An old Stracciatella Linux representation uses a 688-byte header, but it is outside the supported scope. The parser must recognize and reject that layout with an explicit unsupported-format error; it must not attempt to parse it as a normal header.
 
-```text
-688 bytes
-```
-
-The parser should use the same detection logic as:
-
-```text
-ExtractSavedGameHeaderFromFile
-ParseSavedGameHeader
-```
-
-rather than simply assuming 432 bytes.
+Use the current `ParseSavedGameHeader` field layout for the normal 432-byte header. Consult `ExtractSavedGameHeaderFromFile` only to understand how the legacy layout differs and how it can be rejected safely.
 
 Important header fields include:
 
@@ -137,20 +124,8 @@ fAlternateSector
 fWorldLoaded
 ubLoadScreenID
 sInitialGameOptions
-uiRandom
 uiSaveStateSize
 ```
-
-`uiRandom` is useful RNG-related information and must be reported.
-
-Stracciatella creates it during save with conceptually:
-
-```cpp
-header.uiRandom = Random(RAND_MAX);
-```
-
-Note that this value is **not necessarily the full state of the modern RNG engine**. Report it accurately as the save-header random value rather than claiming it is a seed unless the source proves otherwise.
-
 ---
 
 # 5. Top-Level Parsing Strategy
@@ -161,11 +136,12 @@ Instead:
 
 1. Parse the save header.
 2. Obtain `uiSavedGameVersion`.
-3. Follow the same section order and version conditions used by `LoadSavedGame()`.
-4. Implement readers/skippers for enough preceding sections to reach the required sections.
-5. Track the current byte offset.
-6. Parse the required sections structurally.
-7. Reject impossible sizes/counts instead of reading outside the file.
+3. Verify that the save version is one of the explicitly supported current versions.
+4. Follow the same section order and applicable version conditions used by `LoadSavedGame()`.
+5. Implement readers/skippers for enough preceding sections to reach the merc-profile array.
+6. Track the current byte offset.
+7. Parse all merc profiles structurally.
+8. Reject impossible sizes/counts instead of reading outside the file.
 
 The implementation does not initially need semantic models for every save section.
 
@@ -178,6 +154,8 @@ fn skip_section(...)
 provided the size can be derived safely from the actual serialized format.
 
 Do not copy magic offsets from a sample `.sav`.
+
+Parsing sections after the merc-profile array is not required for the initial implementation. Successful structural parsing and validation of every expected profile is the intended stopping point; reaching or validating the physical end of the save is not required.
 
 ---
 
@@ -209,7 +187,7 @@ In the normal save format, each serialized profile is:
 716 bytes
 ```
 
-Do not assume 716 is valid for every historical format; inspect the source constants and version/old-Linux handling.
+For the supported normal portable versions, verify the 716-byte constant against the pinned Stracciatella source and require it exactly. Historical and old-Linux profile layouts are unsupported and must not be implemented as compatibility fallbacks.
 
 The serialized profile contains strategic location fields including:
 
@@ -261,7 +239,11 @@ Requirements:
 - do not shell out to Stracciatella
 - do not launch the game
 - add unit tests for encrypt/decrypt symmetry where possible
-- make encryption-set calculation depend on parsed save metadata exactly as Stracciatella does
+- make encryption-set calculation depend on parsed save metadata exactly as English Stracciatella does
+- hard-code the edition branch to English behavior; do not try the German calculation as a fallback
+- fail profile validation clearly if data cannot be decoded using the supported English calculation
+
+German-edition saves are not supported. The save header does not reliably identify that edition, so an unsupported German save may be reported as profile decoding/validation failure rather than edition-specific detection.
 
 Do not describe this internally as strong cryptography. Treat it as the save encoding/obfuscation layer.
 
@@ -271,7 +253,7 @@ Do not describe this internally as strong cryptography. Treat it as the save enc
 
 A profile array index corresponds to a JA2 profile ID.
 
-Resolve IDs to names from Stracciatella source/content rather than maintaining an undocumented manually invented table.
+Derive a documented stock profile-ID/type/canonical-name table from the pinned Stracciatella source content rather than maintaining a manually invented table. Include both stock NPC and RPC profile types. The serialized profile's saved name and nickname remain the primary display values.
 
 Search relevant source for profile IDs and profile data, including:
 
@@ -294,7 +276,14 @@ struct NpcLocation {
 }
 ```
 
-Exact profile ID integer width can follow the source representation.
+Exact profile ID integer width should follow the source representation.
+
+The save does not embed authoritative NPC/RPC type metadata for arbitrary mods. Therefore:
+
+- default NPC eligibility is based on the bundled, source-derived stock NPC/RPC mapping
+- `--all-profiles` exposes every parsed profile regardless of mapped type
+- name filters match case-insensitively against both canonical stock names and saved names/nicknames
+- unknown or modded profile IDs must not be silently classified as stock NPCs
 
 `Sector` should conceptually be:
 
@@ -346,9 +335,9 @@ Always preserve raw `(x,y,z)` in JSON output even if a friendly display string i
 
 # 10. Filtering NPCs
 
-A profile may not currently have a meaningful strategic location.
+A profile may not currently have a meaningful strategic location. Treat `sSector` as the authoritative persisted strategic coordinate, but do not claim that a valid sector alone proves the NPC is currently spawned or tactically placeable.
 
-Distinguish these cases where possible:
+Distinguish these cases where the fields in `MERCPROFILESTRUCT` support doing so:
 
 ```text
 valid strategic sector
@@ -367,139 +356,36 @@ Provide:
 
 ```text
 --all-profiles
+--npc NAME
+--exclude-npc NAME
 ```
 
-to output every parsed profile, including profiles without valid strategic locations.
+`--npc` (also available as `--include-npc`) and `--exclude-npc` must be repeatable and match NPC names case-insensitively. When one or more include filters are supplied, output only matching NPCs; exclusion filters are then applied, so exclusions take precedence when a name matches both. Without include filters, show all normally eligible NPCs except excluded names.
+
+`--all-profiles` outputs every parsed profile, including profiles without valid strategic locations; name filters still apply.
 
 ---
 
-# 11. PreRandom State
-
-Stracciatella's `Random.h` defines:
-
-```cpp
-#define MAX_PREGENERATED_NUMS 256
-
-extern UINT32 guiPreRandomIndex;
-extern UINT32 guiPreRandomNums[MAX_PREGENERATED_NUMS];
-```
-
-These values are serialized directly by:
-
-```text
-SavePreRandomNumbersToSaveGameFile
-```
-
-The on-disk payload is conceptually:
-
-```text
-UINT32 guiPreRandomIndex
-UINT32 guiPreRandomNums[256]
-```
-
-Thus the section contains:
-
-```text
-4 + 256 * 4 = 1028 bytes
-```
-
-assuming normal 32-bit little-endian `UINT32` serialization as used by the implementation.
-
-Extract and expose:
-
-```rust
-struct PreRandomState {
-    index: u32,
-    values: [u32; 256],
-}
-```
-
-Validate:
-
-```text
-index < 256
-```
-
-unless Stracciatella semantics explicitly permit another value.
-
-Do not claim that these are all random numbers used by JA2.
-
-They specifically represent JA2's **pre-generated anti-save-scumming random sequence** used by `PreRandom()` / `PreChance()`.
-
----
-
-# 12. Other RNG Information
-
-Inspect:
-
-```text
-src/sgp/Random.h
-src/sgp/Random.cc
-```
-
-The current engine exposes at least:
-
-```text
-Random(...)
-PreRandom(...)
-Chance(...)
-PreChance(...)
-gRandomEngine
-guiPreRandomIndex
-guiPreRandomNums
-```
-
-`gRandomEngine` is currently an `std::mt19937`.
-
-Determine whether its complete state is serialized anywhere in the save.
-
-If yes:
-
-- decode and expose it.
-
-If no:
-
-- explicitly report that it is not present.
-- do not pretend that `uiRandom` is equivalent to the MT19937 state.
-
-Potential JSON representation:
-
-```json
-{
-  "rng": {
-    "header_random": 32576,
-    "pre_random": {
-      "index": 123,
-      "values": [...]
-    },
-    "engine_state": null
-  }
-}
-```
-
----
-
-# 13. CLI Interface
+# 11. CLI Interface
 
 Binary name:
 
 ```text
-ja2-replay
+ja2-savegame
 ```
 
 Primary command:
 
 ```text
-ja2-replay inspect <FILE>...
+ja2-savegame inspect <FILE>
 ```
 
-It must support one or many files.
+Each invocation must accept exactly one save file. Passing zero files or more than one file is a CLI usage error.
 
-Examples:
+Example:
 
 ```text
-ja2-replay inspect replay1.sav
-ja2-replay inspect replay1.sav replay2.sav replay3.sav
+ja2-savegame inspect savegame1.sav
 ```
 
 Useful options:
@@ -509,30 +395,34 @@ Useful options:
 --pretty
 --all-profiles
 --npc NAME
---rng
---no-rng
+--include-npc NAME
+--exclude-npc NAME
 --source-version
 ```
 
-`--npc` should be repeatable:
+Output must be exportable as either a plaintext list (the default when `--json` is absent) or valid JSON (`--json`). `--pretty` may format JSON for readability but must not make it invalid.
+
+`--npc` is an alias for `--include-npc`. Include and exclude options should be repeatable:
 
 ```text
-ja2-replay inspect *.sav \
-  --npc Hamous \
-  --npc Skyrider \
-  --npc Devin
+ja2-savegame inspect savegame1.sav \
+  --include-npc Hamous \
+  --include-npc Skyrider \
+  --exclude-npc Devin
 ```
 
-Case-insensitive matching is desirable.
+All NPC-name matching must be case-insensitive and consider canonical stock name, saved full name, and saved nickname. If an NPC matches both an include and an exclude filter, exclude it.
+
+`--source-version` prints the pinned Stracciatella source commit used as the binary-format and stock-profile-mapping reference; it is distinct from the game-version string stored in each save header.
 
 ---
 
-# 14. Default Human-Readable Output
+# 12. Default Human-Readable Output
 
 Example format:
 
 ```text
-replay-001.sav
+savegame-001.sav
 
 Save
   format version: 102
@@ -548,10 +438,6 @@ NPCs
   Carmen      C13      (3,13,0)
   Micky       H1       (8,1,0)
 
-RNG
-  header random:       32576
-  PreRandom index:     87
-  PreRandom values:    256 values
 ```
 
 The displayed values above are examples only.
@@ -560,36 +446,9 @@ Never encode these locations as expected values.
 
 ---
 
-# 15. Multi-File Comparison
+# 13. JSON Output
 
-Because the main use case involves inspecting multiple RNG outcomes, multi-file output should make differences easy to compare.
-
-For multiple files, a compact mode is desirable:
-
-```text
-FILE              Hamous   Skyrider   Devin   Carmen
-run-001.sav       D9       B15        C6      C13
-run-002.sav       D8       C16        H10     C13
-run-003.sav       D9       B15        H10     C5
-```
-
-Suggested command:
-
-```text
-ja2-replay compare *.sav --npc Hamous --npc Skyrider --npc Devin
-```
-
-JSON support is also required or strongly preferred:
-
-```text
-ja2-replay compare *.sav --json
-```
-
----
-
-# 16. JSON Output
-
-JSON must be stable enough for scripts.
+JSON must be stable enough for scripts and valid JSON in both compact and `--pretty` modes. The plaintext-list mode must contain only human-readable text, not JSON fragments.
 
 Suggested schema:
 
@@ -622,15 +481,7 @@ Suggested schema:
         "name": "D9"
       }
     }
-  ],
-  "rng": {
-    "header_random": 32576,
-    "pre_random": {
-      "index": 87,
-      "values": []
-    },
-    "engine_state": null
-  }
+  ]
 }
 ```
 
@@ -638,49 +489,43 @@ Again, numeric/profile values shown here are examples unless independently deriv
 
 ---
 
-# 17. Version Compatibility
+# 14. Version Compatibility
 
-Do not build specifically for the provided sample files.
-
-The user will supply one or more real replay/save files, potentially produced by different Stracciatella releases.
+Do not build specifically for one sample file, but deliberately support only the normal portable English save versions emitted by the latest supported Stracciatella release/source. For pinned source commit `dcc20b3c24b3e49ccd16e9d4ae87dcd20b9e51ea`, the accepted set is versions 102 and 103.
 
 Required behavior:
 
-1. Parse the header first.
-2. Read `uiSavedGameVersion`.
-3. Follow version gates from `LoadSavedGame()`.
-4. Detect known legacy Stracciatella Linux save layout when applicable.
-5. Support at least the versions represented by supplied test files.
-6. Make adding additional save versions straightforward.
-7. Fail explicitly on an unsupported format.
+1. Read enough of the normal header to obtain `uiSavedGameVersion` safely.
+2. Accept only the explicitly supported versions.
+3. Follow the applicable gates from the pinned `LoadSavedGame()` implementation.
+4. Recognize and reject the legacy 688-byte Stracciatella Linux layout.
+5. Reject versions 101 and below rather than adding backward-compatibility paths.
+6. Reject future unknown versions until their source format has been reviewed explicitly.
+7. Fail clearly on malformed or unsupported input.
 
-Example error:
-
-```text
-unsupported JA2 save version 87 while parsing section StrategicInfo
-```
-
-not:
+Example errors:
 
 ```text
-unexpected EOF
+unsupported JA2 save version 87; supported English portable versions: 102, 103
+legacy Stracciatella Linux saves are not supported
 ```
 
-where the actual cause can be identified.
+Do not continue until a later `unexpected EOF` when the unsupported format can be identified at the header.
 
-A central version-aware abstraction is recommended:
+Keep version handling centralized even though its accepted set is intentionally narrow:
 
 ```rust
 struct SaveContext {
-    save_version: u32,
-    stracciatella_linux_format: bool,
+    save_version: SupportedSaveVersion,
     encryption_set: ...,
 }
 ```
 
+Do not include old-Linux or German-edition switches in the supported parsing context.
+
 ---
 
-# 18. Binary Reader
+# 15. Binary Reader
 
 Implement a bounds-checked binary reader.
 
@@ -716,11 +561,11 @@ run-003.sav: offset 0x17A42, MercProfiles:
 expected 716 encoded bytes for profile 63, only 491 remain
 ```
 
-This is important while reverse-engineering additional save versions.
+This is important for diagnosing malformed files and reviewing a future format deliberately; it is not a requirement to support historical versions.
 
 ---
 
-# 19. Architecture
+# 16. Architecture
 
 Suggested crate structure:
 
@@ -743,9 +588,6 @@ src/
     parser.rs
     ids.rs
 
-  rng/
-    mod.rs
-
   sector.rs
   output.rs
 ```
@@ -758,7 +600,6 @@ Preferred public model:
 pub struct SaveAnalysis {
     pub header: SaveHeader,
     pub profiles: Vec<MercProfile>,
-    pub rng: RngState,
 }
 ```
 
@@ -766,7 +607,15 @@ This permits future use as a Rust library.
 
 ---
 
-# 20. Dependency Policy
+# 17. Dependency and Platform Policy
+
+The project must compile and run natively on:
+
+- Linux
+- Windows 10
+- Windows 11
+
+Use portable Rust and cross-platform crates. Do not depend on Unix-only APIs, shell commands, path conventions, or filesystem behavior at runtime. Treat input paths as platform-native paths, including Windows drive-letter and backslash paths. CI should build and test on both a current Linux runner and a current Windows runner.
 
 Prefer a small dependency set.
 
@@ -788,7 +637,7 @@ No runtime dependency on JA2 Stracciatella should be required.
 
 ---
 
-# 21. Source-Derived Constants
+# 18. Source-Derived Constants
 
 Do not manually duplicate unexplained constants if they can be generated or clearly sourced.
 
@@ -799,9 +648,6 @@ Example:
 ```rust
 // Stracciatella: SAVED_GAME_HEADER::ON_DISK_SIZE
 const SAVE_HEADER_SIZE: usize = 432;
-
-// Stracciatella: MAX_PREGENERATED_NUMS in src/sgp/Random.h
-const PRE_RANDOM_COUNT: usize = 256;
 ```
 
 For complicated layouts such as `MERCPROFILESTRUCT`, mirror the order in `ExtractMercProfile()`.
@@ -810,7 +656,7 @@ That function should be regarded as authoritative for decoding a profile.
 
 ---
 
-# 22. Avoid Parsing Unnecessary Fields
+# 19. Avoid Parsing Unnecessary Fields
 
 For the first implementation, it is not necessary to create Rust fields for all 716 bytes of `MERCPROFILESTRUCT`.
 
@@ -854,9 +700,9 @@ Do not jump directly to guessed offsets unless those offsets are accompanied by 
 
 ---
 
-# 23. Determining Section Boundaries
+# 20. Determining Section Boundaries
 
-The hardest part is reaching `SaveMercProfiles()` and later `SavePreRandomNumbersToSaveGameFile()` correctly.
+The hardest part is reaching `SaveMercProfiles()` correctly.
 
 Do not solve this by looking for recognizable bytes.
 
@@ -885,7 +731,6 @@ map messages
 NPC info
 key table
 temporary NPC quote array
-PreRandom state
 arms dealer inventory
 general info
 ...
@@ -898,7 +743,7 @@ The implementation model must verify the current exact order against `SaveGame()
 
 ---
 
-# 24. Development Strategy
+# 21. Development Strategy
 
 Implement incrementally.
 
@@ -907,7 +752,7 @@ Implement incrementally.
 Given arbitrary supplied saves:
 
 ```text
-ja2-replay inspect foo.sav
+ja2-savegame inspect foo.sav
 ```
 
 correctly prints:
@@ -919,7 +764,6 @@ description
 day/time
 sector
 world-loaded state
-header random
 ```
 
 Verify against Stracciatella's own save/load screen where practical.
@@ -942,22 +786,9 @@ Output strategic locations for all appropriate NPCs.
 
 This is the first feature-complete milestone.
 
-## Milestone 5 — PreRandom
-
-Continue parsing through later sections and extract:
-
-```text
-guiPreRandomIndex
-guiPreRandomNums[256]
-```
-
-## Milestone 6 — Multiple files
-
-Implement compact comparison.
-
 ---
 
-# 25. Debug Mode
+# 22. Debug Mode
 
 Provide:
 
@@ -981,7 +812,6 @@ Useful output:
 ...
 0x00012345 merc_profiles
 ...
-0x001A3456 pre_random
 ```
 
 For each section optionally show bytes consumed:
@@ -997,7 +827,7 @@ This will make compatibility work much easier.
 
 ---
 
-# 26. Validation
+# 23. Validation
 
 The parser must validate assumptions aggressively.
 
@@ -1008,9 +838,8 @@ Examples:
 - valid profile block count
 - every profile parser consumes exactly its defined on-disk size
 - sector x/y either valid or recognized sentinel/unplaced values
-- PreRandom block contains exactly 256 values
 - no file reads exceed bounds
-- final parsing reaches a consistent end/save-state location
+- all expected merc profiles are reached and consume exactly their supported record sizes
 
 Where Stracciatella stores checksums, verify them if practical.
 
@@ -1018,42 +847,39 @@ Profile parsing should use any available profile checksum as an additional corre
 
 ---
 
-# 27. Testing With Supplied Replay Files
+# 24. Testing With Supplied Savegame Files
 
-The implementation will be given multiple real `.sav` files.
+The test fixture corpus may contain multiple real `.sav` files, but every parser and CLI invocation must process them one at a time.
 
-Tests must not assume that every supplied file has the same:
+Successful fixture-parsing tests must use saves within the explicitly supported save-version set. Separate negative tests should verify clear rejection of unsupported versions, layouts, and attempts to pass multiple input files. Across independently parsed fixtures, tests must not assume every save has the same:
 
 ```text
 save version
 game version
 NPC locations
-RNG values
 number of mercs
 current sector
 world-loaded state
 file size
 ```
 
-Use the corpus to test structural robustness.
+Use the fixture set to test structural robustness, invoking the parser separately for each save.
 
 Useful tests:
 
 ```text
-all supplied files parse without panic
+each supplied file parses independently without panic
 header values are plausible
 profile section decrypts successfully
 known NPC names occur
 sector values fall into valid/sentinel ranges
-PreRandom index is plausible
-exactly 256 PreRandom values are parsed
 ```
 
-When files disagree, assume RNG-dependent game state differs rather than treating the disagreement as a parser failure.
+When independently parsed fixtures disagree, treat the differences as possible game-state variation rather than a parser failure.
 
 ---
 
-# 28. Cross-Validation
+# 25. Cross-Validation
 
 Where possible, use Stracciatella itself as an oracle during development.
 
@@ -1069,74 +895,30 @@ Do not make runtime correctness depend on launching the game.
 
 ---
 
-# 29. Non-Goals
+# 26. Non-Goals
 
 The initial version does **not** need to:
 
 - render the JA2 map
 - reproduce gameplay
 - run Stracciatella
-- replay player actions
-- reconstruct RNG calls made before the save
+- reconstruct player actions
+- accept multiple save paths in one invocation or provide a multi-save `compare` command
 - modify saves
 - write saves
-- support JA2 1.13 unless it happens to share a verified compatible format
-- support every historical vanilla JA2 save immediately
+- support JA2 1.13
+- support save versions 101 or earlier
+- support legacy 688-byte Stracciatella Linux saves
+- support German-edition save encoding or auto-detect game edition
+- guarantee authoritative NPC/RPC classification for arbitrary mod-defined profiles
+- parse sections after the merc-profile array merely to reach the end of the file
 - decode every field of every serialized structure
 
 Focus on reliable read-only analysis.
 
 ---
 
-# 30. Important Terminology
-
-Be precise in code and documentation.
-
-The user calls these files **replays**, but internally use terms such as:
-
-```text
-save
-savegame
-SaveAnalysis
-```
-
-unless an actual Stracciatella replay format is discovered separately.
-
-Similarly:
-
-```text
-uiRandom
-```
-
-should be called:
-
-```text
-header_random
-```
-
-not automatically:
-
-```text
-seed
-```
-
-And:
-
-```text
-guiPreRandomNums
-```
-
-should be called:
-
-```text
-pre_random
-```
-
-rather than claiming they represent all game RNG.
-
----
-
-# 31. Deliverables
+# 27. Deliverables
 
 Produce:
 
@@ -1147,38 +929,40 @@ README.md
 tests/...
 ```
 
-README must contain:
+README must contain Linux and Windows build instructions, including:
 
 ```text
 cargo build --release
 
-ja2-replay inspect file.sav
-ja2-replay inspect *.sav --json
-ja2-replay compare *.sav --npc Hamous --npc Skyrider
+ja2-savegame inspect file.sav
+ja2-savegame inspect file.sav --json
+ja2-savegame inspect file.sav --npc Hamous --npc Skyrider
 ```
 
 Also document:
 
-- tested Stracciatella save versions
-- unsupported versions
-- known parser limitations
-- provenance of binary-layout constants
+- the exact supported English portable save versions
+- explicit non-support for historical, old-Linux, German-edition, and unknown future versions
+- known parser limitations, including stock-only authoritative NPC/RPC classification
+- the pinned Stracciatella source commit and provenance of binary-layout constants
 
 ---
 
-# 32. Acceptance Criteria
+# 28. Acceptance Criteria
 
 The implementation is considered successful when:
 
-1. It compiles as a normal Rust project.
+1. It compiles and runs as a normal Rust project on Linux, Windows 10, and Windows 11.
 
-2. It accepts one or multiple arbitrary supplied Stracciatella `.sav` files.
+2. CI builds and tests the project on both Linux and Windows.
 
-3. It parses the save format structurally rather than using offsets learned from one example.
+3. Each invocation accepts exactly one supplied Stracciatella `.sav` file in an explicitly supported English portable format; multiple input paths are rejected as a CLI usage error.
 
-4. For each supported file it extracts strategic NPC locations directly from saved `MERCPROFILESTRUCT` data.
+4. It parses the save format structurally rather than using offsets learned from one example.
 
-5. Named NPC lookup works for at least:
+5. For a supported file it extracts strategic NPC locations directly from saved `MERCPROFILESTRUCT` data.
+
+6. Named NPC lookup works for at least:
    - Hamous
    - Skyrider
    - Devin
@@ -1187,27 +971,19 @@ The implementation is considered successful when:
 
    provided those profiles exist in the source/game version.
 
-6. It emits both JA2 sector notation and raw coordinates.
+7. It emits both JA2 sector notation and raw coordinates.
 
-7. It extracts the header `uiRandom`.
+8. JSON output is available.
 
-8. It extracts:
-   - `guiPreRandomIndex`
-   - all 256 `guiPreRandomNums`
+9. Invalid or unsupported saves return informative errors rather than panicking.
 
-9. JSON output is available.
+10. No runtime Stracciatella installation is required.
 
-10. Multiple saves can be compared conveniently.
-
-11. Invalid or unsupported saves return informative errors rather than panicking.
-
-12. No runtime Stracciatella installation is required.
-
-13. No NPC position or binary offset is hard-coded from a particular sample save.
+11. No NPC position or binary offset is hard-coded from a particular sample save.
 
 ---
 
-# 33. Critical Source Facts Already Established
+# 29. Critical Source Facts Already Established
 
 The following observations have already been verified against Stracciatella source and should be used as starting points.
 
@@ -1219,11 +995,7 @@ The following observations have already been verified against Stracciatella sour
 432 bytes
 ```
 
-and an old Stracciatella Linux representation of:
-
-```text
-688 bytes
-```
+An old Stracciatella Linux representation is 688 bytes, but it is explicitly unsupported and should only be recognized well enough to reject clearly.
 
 ### NPC locations
 
@@ -1250,45 +1022,17 @@ NewJA2EncryptedFileWrite
 
 so a standalone parser must reproduce the corresponding decoding logic.
 
-### RNG header value
-
-The save header contains:
-
-```text
-uiRandom
-```
-
-which is populated from:
-
-```text
-Random(RAND_MAX)
-```
-
-during save.
-
-### Pre-generated RNG state
-
-`Random.h` defines:
-
-```text
-MAX_PREGENERATED_NUMS = 256
-guiPreRandomIndex
-guiPreRandomNums[256]
-```
-
-and `SavePreRandomNumbersToSaveGameFile()` writes the index followed by the complete 256-entry array.
-
 These facts make a standalone parser practical.
 
 ---
 
-# 34. Instruction to the Implementing Coding Model
+# 30. Instruction to the Implementing Coding Model
 
 Do not guess the remaining binary format.
 
 You have:
 
-1. one or more real `.sav` files supplied by the user, and
+1. real `.sav` fixture files supplied by the user, each parsed independently, and
 2. the complete open-source Stracciatella implementation.
 
 Use the saves as test data and Stracciatella as the binary-format specification.
@@ -1299,19 +1043,19 @@ When an offset or size is unclear:
 2. locate its matching `Load*` function,
 3. inspect its data structures and version conditions,
 4. implement that behavior,
-5. verify it against all supplied files.
+5. verify it independently against each supplied fixture.
 
 Prefer a correct partial parser over a brittle full parser based on inferred offsets.
 
 The first target to optimize for is:
 
 ```text
-$ ja2-replay compare *.sav --npc Hamous --npc Skyrider --npc Devin
+$ ja2-savegame inspect savegame.sav --npc Hamous --npc Skyrider --npc Devin
 
-FILE             Hamous    Skyrider    Devin
-a.sav            ...
-b.sav            ...
-c.sav            ...
+NPCs
+  Hamous      D9       (4,9,0)
+  Skyrider    B15      (2,15,0)
+  Devin       C6       (3,6,0)
 ```
 
-Once that works robustly across supplied saves, add full RNG-state reporting.
+Once that works robustly for each supplied fixture independently, keep the focus on reliable NPC-placement reporting.
