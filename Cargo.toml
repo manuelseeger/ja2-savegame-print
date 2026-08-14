@@ -1,6 +1,6 @@
 [package]
 name = "ja2-savegame"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Inspect Jagged Alliance 2 Stracciatella save games"
 license = "MIT"
