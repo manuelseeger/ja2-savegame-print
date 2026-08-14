@@ -38,7 +38,7 @@ jobs:
             os: windows-latest
             asset: ja2-savegame-windows-x86_64.exe
           - platform: macOS x86_64
-            os: macos-13
+            os: macos-15-intel
             asset: ja2-savegame-macos-x86_64
     runs-on: ${{ matrix.os }}
     steps:
