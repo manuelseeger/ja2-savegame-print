@@ -11,7 +11,7 @@ fn binary() -> Command {
 #[test]
 fn json_output_is_valid_and_all_profiles_returns_every_profile() {
     let output = binary()
-        .args(["inspect", FIXTURE, "--json", "--all-profiles"])
+        .args([FIXTURE, "--json", "--all-profiles"])
         .output()
         .expect("CLI should run");
 
@@ -29,7 +29,6 @@ fn json_output_is_valid_and_all_profiles_returns_every_profile() {
 fn exclusion_filter_takes_precedence_over_include_filter() {
     let output = binary()
         .args([
-            "inspect",
             FIXTURE,
             "--json",
             "--all-profiles",
@@ -49,7 +48,7 @@ fn exclusion_filter_takes_precedence_over_include_filter() {
 #[test]
 fn multiple_input_paths_are_a_usage_error() {
     let output = binary()
-        .args(["inspect", FIXTURE, FIXTURE])
+        .args([FIXTURE, FIXTURE])
         .output()
         .expect("CLI should run");
 

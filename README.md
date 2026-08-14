@@ -28,78 +28,77 @@ Inspect one savegame:
 ### Linux
 
 ```sh
-./ja2-savegame inspect /path/to/savegame.sav
+./ja2-savegame /path/to/savegame.sav
 ```
 
 ### macOS
 
 ```sh
-./ja2-savegame inspect /path/to/savegame.sav
+./ja2-savegame /path/to/savegame.sav
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-.\ja2-savegame-windows-x86_64.exe inspect C:\path\to\savegame.sav
+.\ja2-savegame-windows-x86_64.exe C:\path\to\savegame.sav
 ```
 
-The default output contains stock NPCs and RPCs that have a meaningful saved
-strategic location. Surface sectors use JA2 notation such as `O4`; underground
-sectors include their depth, such as `A9-2`. Raw coordinates are shown as well.
+By default, the tool lists characters from the original game whose location is
+recorded in the save. Sectors use the familiar JA2 notation, such as `O4` or
+`A9-2` for underground locations. The saved coordinates are also shown.
 
 ### Options
 
 ```sh
-# Show selected NPCs (repeatable, case-insensitive)
-ja2-savegame inspect file.sav --npc Hamous --npc Skyrider
+# Show only selected characters (repeatable; capitalization does not matter)
+ja2-savegame file.sav --npc Hamous --npc Skyrider
 
-# --include-npc is the long form of --npc
-ja2-savegame inspect file.sav --include-npc Devin
+# --include-npc is the longer form of --npc
+ja2-savegame file.sav --include-npc Devin
 
-# Exclusions take precedence over inclusions
-ja2-savegame inspect file.sav --exclude-npc Carmen
+# Exclude a character, even when also selected with --npc
+ja2-savegame file.sav --exclude-npc Carmen
 
-# Include all 170 profiles, including unmapped or unplaced profiles
-ja2-savegame inspect file.sav --all-profiles
+# Include every character, even those with no known name or location
+ja2-savegame file.sav --all-profiles
 
-# Machine-readable output
-ja2-savegame inspect file.sav --json
-ja2-savegame inspect file.sav --json --pretty
+# Output as JSON
+ja2-savegame file.sav --json
+ja2-savegame file.sav --json --pretty
 
-# Show parsed section offsets on stderr
-ja2-savegame inspect file.sav -v
-ja2-savegame inspect file.sav -vv
-
-# Print the pinned Stracciatella source revision
-ja2-savegame --source-version
+# Show diagnostic details (-vv shows more)
+ja2-savegame file.sav -v
+ja2-savegame file.sav -vv
 ```
 
-Each `inspect` invocation accepts exactly one save file. Name filters match the
-stock canonical name, saved full name, and saved nickname.
+You can inspect one save file at a time. Character selection accepts the usual
+name, full name, or nickname.
 
 ## Supported savegames
 
-The tool deliberately supports only normal portable **English-edition**
-Stracciatella save format versions **102 and 103**.
+The tool supports normal saves from the **English edition** of:
+
+- JA2 Stracciatella **v0.19.0 through v0.22.1**
+- development builds after v0.22.1, up to the version listed under
+  [Format reference](#format-reference)
 
 It does not support:
 
-- save format version 101 or older
-- unknown future save versions
-- legacy 688-byte Stracciatella Linux saves
-- German-edition save encoding
+- saves from Stracciatella v0.18.0 or older
+- newer Stracciatella versions not listed above
+- the old Linux-specific save format
+- saves from the German edition
 - JA2 1.13 saves
-- arbitrary mod-defined save layouts
+- saves whose format has been changed by a mod
 
-Malformed and unsupported files are rejected with an error rather than parsed
-heuristically. An unsupported German save may be reported as a profile
-decoding or checksum failure because the header does not reliably identify the
-edition.
+Damaged and unsupported files are rejected with an error. A German save may
+produce an error about character data or a checksum because the save itself
+does not reliably identify the game edition.
 
-A valid saved sector is strategic state; it does not necessarily prove that an
-NPC is currently spawned in a loaded tactical map. Output distinguishes states
-such as placed, not currently placed, dead, unavailable, and recruited where
-the persisted profile fields permit it.
+A reported sector is the location recorded in the save; it does not always
+mean that the character is currently visible on the tactical map. When the
+save contains enough information, the output indicates whether a character is
+placed, dead, unavailable, or recruited.
 
 ## Known limitations
 
@@ -120,6 +119,8 @@ commit:
 ```text
 dcc20b3c24b3e49ccd16e9d4ae87dcd20b9e51ea
 ```
+
+Run `ja2-savegame --source-version` to print this value.
 
 Important constants were derived from `SaveLoadGame.cc`, `Laptop.cc`,
 `LoadSaveMercProfile.cc`, `Tactical_Save.cc`, and

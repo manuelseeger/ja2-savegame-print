@@ -1,9 +1,9 @@
 use std::{io, process::ExitCode};
 
-use clap::{CommandFactory, Parser};
+use clap::Parser;
 use ja2_savegame::{
     analyze_file,
-    cli::{Cli, Command},
+    cli::Cli,
     output::{write_output, OutputOptions},
     save::STRACCIATELLA_SOURCE_COMMIT,
 };
@@ -26,16 +26,11 @@ fn run() -> Result<(), io::Error> {
         return Ok(());
     }
 
-    let Some(Command::Inspect(args)) = cli.command else {
-        Cli::command().print_help()?;
-        println!();
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "the 'inspect <FILE>' command is required",
-        ));
-    };
-
-    let analysis = analyze_file(&args.file).map_err(io::Error::other)?;
+    let file = cli
+        .file
+        .as_deref()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "a save file is required"))?;
+    let analysis = analyze_file(file).map_err(io::Error::other)?;
     if cli.verbose > 0 {
         for section in &analysis.sections {
             if cli.verbose > 1 {
@@ -54,11 +49,11 @@ fn run() -> Result<(), io::Error> {
     write_output(
         &analysis,
         &OutputOptions {
-            json: args.json,
-            pretty: args.pretty,
-            all_profiles: args.all_profiles,
-            include: &args.include_npc,
-            exclude: &args.exclude_npc,
+            json: cli.json,
+            pretty: cli.pretty,
+            all_profiles: cli.all_profiles,
+            include: &cli.include_npc,
+            exclude: &cli.exclude_npc,
         },
         io::stdout().lock(),
     )
