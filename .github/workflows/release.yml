@@ -37,6 +37,9 @@ jobs:
           - platform: Windows x86_64
             os: windows-latest
             asset: ja2-savegame-windows-x86_64.exe
+          - platform: macOS x86_64
+            os: macos-13
+            asset: ja2-savegame-macos-x86_64
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -46,6 +49,11 @@ jobs:
         run: cargo build --release --locked
       - name: Prepare Linux asset
         if: runner.os == 'Linux'
+        run: |
+          mkdir -p release-assets
+          cp target/release/ja2-savegame "release-assets/${{ matrix.asset }}"
+      - name: Prepare macOS asset
+        if: runner.os == 'macOS'
         run: |
           mkdir -p release-assets
           cp target/release/ja2-savegame "release-assets/${{ matrix.asset }}"

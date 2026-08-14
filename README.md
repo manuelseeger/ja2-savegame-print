@@ -11,12 +11,14 @@ Download the latest binary from the
 
 - **Linux x86_64:** `ja2-savegame-linux-x86_64`
 - **Windows x86_64:** `ja2-savegame-windows-x86_64.exe`
+- **macOS x86_64:** `ja2-savegame-macos-x86_64`
 
-On Linux, make the downloaded file executable and optionally rename it:
+On Linux or macOS, make the downloaded file executable and optionally rename it:
 
 ```sh
-chmod +x ja2-savegame-linux-x86_64
-mv ja2-savegame-linux-x86_64 ja2-savegame
+# macOS (use ja2-savegame-linux-x86_64 on Linux)
+chmod +x ja2-savegame-macos-x86_64
+mv ja2-savegame-macos-x86_64 ja2-savegame
 ```
 
 ## Usage
@@ -24,6 +26,12 @@ mv ja2-savegame-linux-x86_64 ja2-savegame
 Inspect one savegame:
 
 ### Linux
+
+```sh
+./ja2-savegame inspect /path/to/savegame.sav
+```
+
+### macOS
 
 ```sh
 ./ja2-savegame inspect /path/to/savegame.sav
@@ -130,5 +138,5 @@ cargo build --release --locked
 
 The resulting executable is:
 
-- Linux: `target/release/ja2-savegame`
+- Linux and macOS: `target/release/ja2-savegame`
 - Windows: `target\release\ja2-savegame.exe`
