@@ -56,10 +56,8 @@ fn list_npcs_prints_names_without_locations() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lines = stdout.lines().collect::<Vec<_>>();
     assert_eq!(lines.first(), Some(&"Nickname   Full name"));
-    assert!(lines.iter().any(|line| *line == "Hamous     Hamous"));
-    assert!(lines
-        .iter()
-        .any(|line| *line == "RPC65      Eskimo - Removed"));
+    assert!(lines.contains(&"Hamous     Hamous"));
+    assert!(lines.contains(&"RPC65      Eskimo - Removed"));
     let nicknames = lines
         .iter()
         .skip(1)

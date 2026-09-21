@@ -156,11 +156,14 @@ fn decode_bytes(bytes: &[u8]) -> String {
 }
 
 pub(crate) fn decode_utf16_le(bytes: &[u8]) -> String {
-    let units: Vec<u16> = bytes
-        .chunks_exact(2)
-        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
-        .take_while(|&unit| unit != 0)
-        .collect();
+    let mut units = Vec::new();
+    for index in (0..bytes.len().saturating_sub(1)).step_by(2) {
+        let unit = u16::from_le_bytes([bytes[index], bytes[index + 1]]);
+        if unit == 0 {
+            break;
+        }
+        units.push(unit);
+    }
     String::from_utf16_lossy(&units).trim().to_owned()
 }
 
