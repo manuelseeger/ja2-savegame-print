@@ -46,6 +46,21 @@ fn exclusion_filter_takes_precedence_over_include_filter() {
 }
 
 #[test]
+fn list_npcs_prints_names_without_locations() {
+    let output = binary()
+        .args([FIXTURE, "--list-npcs"])
+        .output()
+        .expect("CLI should run");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.lines().any(|line| line == "Hamous"));
+    assert!(stdout.lines().any(|line| line == "Eskimo - Removed"));
+    assert!(!stdout.contains("("));
+    assert!(!stdout.contains("J1-1"));
+}
+
+#[test]
 fn multiple_input_paths_are_a_usage_error() {
     let output = binary()
         .args([FIXTURE, FIXTURE])

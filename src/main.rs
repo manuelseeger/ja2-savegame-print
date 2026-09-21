@@ -52,6 +52,7 @@ fn run() -> Result<(), io::Error> {
             json: cli.json,
             pretty: cli.pretty,
             all_profiles: cli.all_profiles,
+            list_npcs: cli.list_npcs,
             include: &cli.include_npc,
             exclude: &cli.exclude_npc,
         },

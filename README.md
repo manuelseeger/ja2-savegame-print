@@ -62,6 +62,9 @@ ja2-savegame file.sav --exclude-npc Carmen
 # Include every character, even those with no known name or location
 ja2-savegame file.sav --all-profiles
 
+# Print only NPC names, one per line, without locations
+ja2-savegame file.sav --list-npcs
+
 # Output as JSON
 ja2-savegame file.sav --json
 ja2-savegame file.sav --json --pretty

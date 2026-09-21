@@ -8,6 +8,7 @@ pub struct OutputOptions<'a> {
     pub json: bool,
     pub pretty: bool,
     pub all_profiles: bool,
+    pub list_npcs: bool,
     pub include: &'a [String],
     pub exclude: &'a [String],
 }
@@ -21,7 +22,8 @@ pub fn selected_profiles<'a>(
         .iter()
         .filter(|profile| {
             options.all_profiles
-                || (profile.is_stock_npc_or_rpc() && profile.has_meaningful_location())
+                || (profile.is_stock_npc_or_rpc()
+                    && (options.list_npcs || profile.has_meaningful_location()))
         })
         .filter(|profile| {
             options.include.is_empty()
@@ -46,17 +48,35 @@ pub fn write_output(
 ) -> Result<(), io::Error> {
     let profiles = selected_profiles(analysis, options);
     if options.json {
-        let document = JsonDocument {
-            file: &analysis.file,
-            header: &analysis.header,
-            npcs: profiles,
-        };
-        if options.pretty {
-            serde_json::to_writer_pretty(&mut output, &document)?;
+        if options.list_npcs {
+            let document = JsonNameListDocument {
+                file: &analysis.file,
+                header: &analysis.header,
+                npcs: profiles
+                    .iter()
+                    .map(|profile| profile.display_name())
+                    .collect(),
+            };
+            if options.pretty {
+                serde_json::to_writer_pretty(&mut output, &document)?;
+            } else {
+                serde_json::to_writer(&mut output, &document)?;
+            }
         } else {
-            serde_json::to_writer(&mut output, &document)?;
+            let document = JsonDocument {
+                file: &analysis.file,
+                header: &analysis.header,
+                npcs: profiles,
+            };
+            if options.pretty {
+                serde_json::to_writer_pretty(&mut output, &document)?;
+            } else {
+                serde_json::to_writer(&mut output, &document)?;
+            }
         }
         writeln!(output)?;
+    } else if options.list_npcs {
+        write_name_list(&profiles, &mut output)?;
     } else {
         write_text(analysis, &profiles, &mut output)?;
     }
@@ -68,6 +88,20 @@ struct JsonDocument<'a> {
     file: &'a str,
     header: &'a crate::save::SaveHeader,
     npcs: Vec<&'a MercProfile>,
+}
+
+#[derive(Serialize)]
+struct JsonNameListDocument<'a> {
+    file: &'a str,
+    header: &'a crate::save::SaveHeader,
+    npcs: Vec<&'a str>,
+}
+
+fn write_name_list(profiles: &[&MercProfile], mut output: impl Write) -> Result<(), io::Error> {
+    for profile in profiles {
+        writeln!(output, "{}", profile.display_name())?;
+    }
+    Ok(())
 }
 
 fn write_text(
