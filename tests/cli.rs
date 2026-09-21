@@ -46,6 +46,29 @@ fn exclusion_filter_takes_precedence_over_include_filter() {
 }
 
 #[test]
+fn list_npcs_prints_names_without_locations() {
+    let output = binary()
+        .args([FIXTURE, "--list-npcs"])
+        .output()
+        .expect("CLI should run");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines = stdout.lines().collect::<Vec<_>>();
+    assert_eq!(lines.first(), Some(&"Nickname   Full name"));
+    assert!(lines.contains(&"Hamous     Hamous"));
+    assert!(lines.contains(&"RPC65      Eskimo - Removed"));
+    let nicknames = lines
+        .iter()
+        .skip(1)
+        .map(|line| line.split_whitespace().next().unwrap().to_lowercase())
+        .collect::<Vec<_>>();
+    assert!(nicknames.windows(2).all(|pair| pair[0] <= pair[1]));
+    assert!(!stdout.contains("("));
+    assert!(!stdout.contains("J1-1"));
+}
+
+#[test]
 fn multiple_input_paths_are_a_usage_error() {
     let output = binary()
         .args([FIXTURE, FIXTURE])

@@ -29,6 +29,10 @@ pub struct Cli {
     #[arg(long)]
     pub all_profiles: bool,
 
+    /// Print NPC nicknames and full names without locations.
+    #[arg(long)]
+    pub list_npcs: bool,
+
     /// Show a character by name (repeatable; --npc is an alias).
     #[arg(long = "include-npc", visible_alias = "npc", value_name = "NAME")]
     pub include_npc: Vec<String>,

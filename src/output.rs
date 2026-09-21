@@ -8,6 +8,7 @@ pub struct OutputOptions<'a> {
     pub json: bool,
     pub pretty: bool,
     pub all_profiles: bool,
+    pub list_npcs: bool,
     pub include: &'a [String],
     pub exclude: &'a [String],
 }
@@ -21,7 +22,8 @@ pub fn selected_profiles<'a>(
         .iter()
         .filter(|profile| {
             options.all_profiles
-                || (profile.is_stock_npc_or_rpc() && profile.has_meaningful_location())
+                || (profile.is_stock_npc_or_rpc()
+                    && (options.list_npcs || profile.has_meaningful_location()))
         })
         .filter(|profile| {
             options.include.is_empty()
@@ -46,17 +48,39 @@ pub fn write_output(
 ) -> Result<(), io::Error> {
     let profiles = selected_profiles(analysis, options);
     if options.json {
-        let document = JsonDocument {
-            file: &analysis.file,
-            header: &analysis.header,
-            npcs: profiles,
-        };
-        if options.pretty {
-            serde_json::to_writer_pretty(&mut output, &document)?;
+        if options.list_npcs {
+            let entries = sorted_name_list_entries(&profiles);
+            let document = JsonNameListDocument {
+                file: &analysis.file,
+                header: &analysis.header,
+                npcs: entries
+                    .iter()
+                    .map(|entry| JsonNameListEntry {
+                        nickname: entry.nickname,
+                        full_name: entry.full_name,
+                    })
+                    .collect(),
+            };
+            if options.pretty {
+                serde_json::to_writer_pretty(&mut output, &document)?;
+            } else {
+                serde_json::to_writer(&mut output, &document)?;
+            }
         } else {
-            serde_json::to_writer(&mut output, &document)?;
+            let document = JsonDocument {
+                file: &analysis.file,
+                header: &analysis.header,
+                npcs: profiles,
+            };
+            if options.pretty {
+                serde_json::to_writer_pretty(&mut output, &document)?;
+            } else {
+                serde_json::to_writer(&mut output, &document)?;
+            }
         }
         writeln!(output)?;
+    } else if options.list_npcs {
+        write_name_list(&profiles, &mut output)?;
     } else {
         write_text(analysis, &profiles, &mut output)?;
     }
@@ -68,6 +92,67 @@ struct JsonDocument<'a> {
     file: &'a str,
     header: &'a crate::save::SaveHeader,
     npcs: Vec<&'a MercProfile>,
+}
+
+#[derive(Serialize)]
+struct JsonNameListDocument<'a> {
+    file: &'a str,
+    header: &'a crate::save::SaveHeader,
+    npcs: Vec<JsonNameListEntry<'a>>,
+}
+
+#[derive(Serialize)]
+struct JsonNameListEntry<'a> {
+    nickname: &'a str,
+    full_name: &'a str,
+}
+
+struct NameListEntry<'a> {
+    nickname: &'a str,
+    full_name: &'a str,
+}
+
+fn sorted_name_list_entries<'a>(profiles: &'a [&'a MercProfile]) -> Vec<NameListEntry<'a>> {
+    let mut entries = profiles
+        .iter()
+        .map(|profile| NameListEntry {
+            nickname: profile
+                .nickname
+                .as_deref()
+                .unwrap_or_else(|| profile.display_name()),
+            full_name: if profile.name.is_empty() {
+                profile.display_name()
+            } else {
+                &profile.name
+            },
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_cached_key(|entry| {
+        (
+            entry.nickname.to_lowercase(),
+            entry.full_name.to_lowercase(),
+        )
+    });
+    entries
+}
+
+fn write_name_list(profiles: &[&MercProfile], mut output: impl Write) -> Result<(), io::Error> {
+    let entries = sorted_name_list_entries(profiles);
+    let nickname_width = entries
+        .iter()
+        .map(|entry| entry.nickname.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max("Nickname".len());
+    writeln!(output, "{:<nickname_width$}  Full name", "Nickname")?;
+    for entry in entries {
+        writeln!(
+            output,
+            "{:<nickname_width$}  {}",
+            entry.nickname, entry.full_name
+        )?;
+    }
+    Ok(())
 }
 
 fn write_text(
