@@ -35,11 +35,11 @@ impl Sector {
         if !(1..=16).contains(&x) || !(1..=16).contains(&y) || !(0..=3).contains(&z) {
             return None;
         }
-        let column = char::from(b'A' + (x as u8 - 1));
+        let row = char::from(b'A' + (y as u8 - 1));
         if z == 0 {
-            Some(format!("{column}{y}"))
+            Some(format!("{row}{x}"))
         } else {
-            Some(format!("{column}{y}-{z}"))
+            Some(format!("{row}{x}-{z}"))
         }
     }
 }
@@ -51,13 +51,13 @@ mod tests {
     #[test]
     fn new_surface_sector_formats_ja2_notation() {
         let sector = Sector::new(15, 4, 0);
-        assert_eq!(sector.name.unwrap().to_string(), "O4");
+        assert_eq!(sector.name.unwrap().to_string(), "D15");
     }
 
     #[test]
     fn new_underground_sector_includes_depth() {
         let sector = Sector::new(1, 9, 2);
-        assert_eq!(sector.name.unwrap().to_string(), "A9-2");
+        assert_eq!(sector.name.unwrap().to_string(), "I1-2");
     }
 
     #[test]

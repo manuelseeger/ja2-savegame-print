@@ -3,6 +3,7 @@ use std::process::Command;
 use ja2_savegame::save::STRACCIATELLA_SOURCE_COMMIT;
 
 const FIXTURE: &str = "fixtures/savegames/2026-08-12t12-19-22z-tixa-done.sav";
+const ISSUE_3_FIXTURE: &str = "fixtures/issues/3/Auto01.sav";
 
 fn binary() -> Command {
     Command::new(env!("CARGO_BIN_EXE_ja2-savegame"))
@@ -66,6 +67,44 @@ fn list_npcs_prints_names_without_locations() {
     assert!(nicknames.windows(2).all(|pair| pair[0] <= pair[1]));
     assert!(!stdout.contains("("));
     assert!(!stdout.contains("J1-1"));
+}
+
+#[test]
+fn issue_3_reports_current_npc_and_rpc_sectors() {
+    let output = binary()
+        .args([
+            ISSUE_3_FIXTURE,
+            "--npc",
+            "Hamous",
+            "--npc",
+            "Dynamo",
+            "--npc",
+            "Ira",
+            "--npc",
+            "Devin",
+            "--npc",
+            "Carmen",
+            "--npc",
+            "Micky",
+        ])
+        .output()
+        .expect("CLI should run");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for expected in [
+        "Ira Smythe            D13      (13,4,0)",
+        "Devin Connell         G9       (9,7,0)",
+        "Hamous                J9       (9,10,0)",
+        "Greg \"Dynamo\" Duncan  J9-1     (9,10,1)",
+        "Carmen Dancio         C5       (5,3,0)",
+        "Micky O'Brien         H2       (2,8,0)",
+    ] {
+        assert!(
+            stdout.contains(expected),
+            "missing {expected:?} in\n{stdout}"
+        );
+    }
 }
 
 #[test]
