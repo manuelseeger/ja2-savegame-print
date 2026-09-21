@@ -49,12 +49,16 @@ pub fn write_output(
     let profiles = selected_profiles(analysis, options);
     if options.json {
         if options.list_npcs {
+            let entries = sorted_name_list_entries(&profiles);
             let document = JsonNameListDocument {
                 file: &analysis.file,
                 header: &analysis.header,
-                npcs: profiles
+                npcs: entries
                     .iter()
-                    .map(|profile| profile.display_name())
+                    .map(|entry| JsonNameListEntry {
+                        nickname: entry.nickname,
+                        full_name: entry.full_name,
+                    })
                     .collect(),
             };
             if options.pretty {
@@ -94,12 +98,59 @@ struct JsonDocument<'a> {
 struct JsonNameListDocument<'a> {
     file: &'a str,
     header: &'a crate::save::SaveHeader,
-    npcs: Vec<&'a str>,
+    npcs: Vec<JsonNameListEntry<'a>>,
+}
+
+#[derive(Serialize)]
+struct JsonNameListEntry<'a> {
+    nickname: &'a str,
+    full_name: &'a str,
+}
+
+struct NameListEntry<'a> {
+    nickname: &'a str,
+    full_name: &'a str,
+}
+
+fn sorted_name_list_entries<'a>(profiles: &'a [&'a MercProfile]) -> Vec<NameListEntry<'a>> {
+    let mut entries = profiles
+        .iter()
+        .map(|profile| NameListEntry {
+            nickname: profile
+                .nickname
+                .as_deref()
+                .unwrap_or_else(|| profile.display_name()),
+            full_name: if profile.name.is_empty() {
+                profile.display_name()
+            } else {
+                &profile.name
+            },
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_cached_key(|entry| {
+        (
+            entry.nickname.to_lowercase(),
+            entry.full_name.to_lowercase(),
+        )
+    });
+    entries
 }
 
 fn write_name_list(profiles: &[&MercProfile], mut output: impl Write) -> Result<(), io::Error> {
-    for profile in profiles {
-        writeln!(output, "{}", profile.display_name())?;
+    let entries = sorted_name_list_entries(profiles);
+    let nickname_width = entries
+        .iter()
+        .map(|entry| entry.nickname.chars().count())
+        .max()
+        .unwrap_or(0)
+        .max("Nickname".len());
+    writeln!(output, "{:<nickname_width$}  Full name", "Nickname")?;
+    for entry in entries {
+        writeln!(
+            output,
+            "{:<nickname_width$}  {}",
+            entry.nickname, entry.full_name
+        )?;
     }
     Ok(())
 }

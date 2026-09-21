@@ -29,7 +29,7 @@ pub struct Cli {
     #[arg(long)]
     pub all_profiles: bool,
 
-    /// Print only NPC names, one per line, without locations.
+    /// Print NPC nicknames and full names without locations.
     #[arg(long)]
     pub list_npcs: bool,
 
