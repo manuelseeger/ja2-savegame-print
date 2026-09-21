@@ -2,7 +2,10 @@ use std::{fs, path::Path};
 
 use serde::Serialize;
 
-use crate::profile::{parse_profile, MercProfile, MERC_PROFILE_SIZE, NUM_PROFILES};
+use crate::{
+    profile::{parse_profile, MercProfile, MERC_PROFILE_SIZE, NUM_PROFILES},
+    sector::Sector,
+};
 
 use super::{
     encryption,
@@ -17,6 +20,12 @@ const STRATEGIC_EVENT_SIZE: usize = 28;
 const LAPTOP_FIXED_SIZE: usize = 7_440;
 const BOBBY_RAY_ORDER_SIZE: usize = 84;
 const INSURANCE_PAYOUT_SIZE: usize = 8;
+const TOTAL_SOLDIERS: usize = 148;
+const SOLDIER_TYPE_SIZE: usize = 2_328;
+const SOLDIER_PROFILE_ID_OFFSET: usize = 1_825;
+const SOLDIER_SECTOR_OFFSET: usize = 1_922;
+const MERC_PATH_NODE_SIZE: usize = 20;
+const KEY_RING_SIZE: usize = 64 * 2;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SaveAnalysis {
@@ -113,12 +122,68 @@ pub fn analyze_bytes(path: &Path, bytes: &[u8]) -> Result<SaveAnalysis, ParseErr
         end: reader.position(),
     });
 
+    apply_active_soldier_locations(&mut reader, &mut sections, &mut profiles, context)?;
+
     Ok(SaveAnalysis {
         file: path.to_string_lossy().into_owned(),
         header,
         profiles,
         sections,
     })
+}
+
+fn apply_active_soldier_locations(
+    reader: &mut Reader<'_>,
+    sections: &mut Vec<SectionTrace>,
+    profiles: &mut [MercProfile],
+    context: SaveContext,
+) -> Result<(), ParseError> {
+    let start = reader.position();
+    reader.set_section("SoldierStructure");
+    for slot in 0..TOTAL_SOLDIERS {
+        let active = reader.read_u8()?;
+        if active == 0 {
+            continue;
+        }
+        let encoded = reader.read_bytes(
+            SOLDIER_TYPE_SIZE,
+            format!("expected {SOLDIER_TYPE_SIZE} encoded bytes for active soldier {slot}"),
+        )?;
+        let decoded = encryption::decrypt(encoded, context.encryption_set);
+        let profile_id = usize::from(decoded[SOLDIER_PROFILE_ID_OFFSET]);
+        if let Some(profile) = profiles.get_mut(profile_id) {
+            let x = i16::from_le_bytes([
+                decoded[SOLDIER_SECTOR_OFFSET],
+                decoded[SOLDIER_SECTOR_OFFSET + 1],
+            ]);
+            let y = i16::from_le_bytes([
+                decoded[SOLDIER_SECTOR_OFFSET + 2],
+                decoded[SOLDIER_SECTOR_OFFSET + 3],
+            ]);
+            let z = decoded[SOLDIER_SECTOR_OFFSET + 4] as i8;
+            if x > 0 && y > 0 {
+                profile.sector = Sector::new(x as u16, y as u16, z);
+            }
+        }
+
+        let path_nodes = reader.read_u32_le()? as usize;
+        let path_size = path_nodes
+            .checked_mul(MERC_PATH_NODE_SIZE)
+            .ok_or_else(|| reader.error(format!("merc path node count {path_nodes} overflows")))?;
+        reader.skip(
+            path_size,
+            format!("expected {path_nodes} merc path nodes of {MERC_PATH_NODE_SIZE} bytes each"),
+        )?;
+        if reader.read_u8()? != 0 {
+            reader.skip(KEY_RING_SIZE, "expected active soldier key ring")?;
+        }
+    }
+    sections.push(SectionTrace {
+        name: "soldier_structure",
+        start,
+        end: reader.position(),
+    });
+    Ok(())
 }
 
 fn skip_fixed(
