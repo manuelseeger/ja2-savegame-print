@@ -31,6 +31,18 @@ fn run() -> Result<(), io::Error> {
         .as_deref()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "a save file is required"))?;
     let analysis = analyze_file(file).map_err(io::Error::other)?;
+    let item = cli
+        .item
+        .as_deref()
+        .map(|name| {
+            ja2_savegame::item::lookup(name).ok_or_else(|| {
+                io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    format!("unknown item {name:?}; supported items: aluminum-rod"),
+                )
+            })
+        })
+        .transpose()?;
     if cli.verbose > 0 {
         for section in &analysis.sections {
             if cli.verbose > 1 {
@@ -53,6 +65,7 @@ fn run() -> Result<(), io::Error> {
             pretty: cli.pretty,
             all_profiles: cli.all_profiles,
             list_npcs: cli.list_npcs,
+            item: item.as_ref(),
             include: &cli.include_npc,
             exclude: &cli.exclude_npc,
         },

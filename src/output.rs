@@ -2,13 +2,14 @@ use std::io::{self, Write};
 
 use serde::Serialize;
 
-use crate::{profile::MercProfile, save::SaveAnalysis};
+use crate::{item::Item, profile::MercProfile, save::SaveAnalysis};
 
 pub struct OutputOptions<'a> {
     pub json: bool,
     pub pretty: bool,
     pub all_profiles: bool,
     pub list_npcs: bool,
+    pub item: Option<&'a Item>,
     pub include: &'a [String],
     pub exclude: &'a [String],
 }
@@ -47,6 +48,23 @@ pub fn write_output(
     mut output: impl Write,
 ) -> Result<(), io::Error> {
     let profiles = selected_profiles(analysis, options);
+    if let Some(item) = options.item {
+        if options.json {
+            let document = ItemDocument {
+                file: &analysis.file,
+                item,
+            };
+            if options.pretty {
+                serde_json::to_writer_pretty(&mut output, &document)?;
+            } else {
+                serde_json::to_writer(&mut output, &document)?;
+            }
+            writeln!(output)?;
+        } else {
+            write_item(item, &mut output)?;
+        }
+        return Ok(());
+    }
     if options.json {
         if options.list_npcs {
             let entries = sorted_name_list_entries(&profiles);
@@ -85,6 +103,12 @@ pub fn write_output(
         write_text(analysis, &profiles, &mut output)?;
     }
     Ok(())
+}
+
+#[derive(Serialize)]
+struct ItemDocument<'a> {
+    file: &'a str,
+    item: &'a Item,
 }
 
 #[derive(Serialize)]
@@ -134,6 +158,25 @@ fn sorted_name_list_entries<'a>(profiles: &'a [&'a MercProfile]) -> Vec<NameList
         )
     });
     entries
+}
+
+fn write_item(item: &Item, mut output: impl Write) -> Result<(), io::Error> {
+    writeln!(output, "{} (item {})", item.name, item.item_index)?;
+    writeln!(output, "Sector  Count  Absent chance")?;
+    for location in &item.locations {
+        let sector = location
+            .sector
+            .name
+            .as_ref()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| "N/A".to_owned());
+        writeln!(
+            output,
+            "{:<6}  {:>5}  {:>13}%",
+            sector, location.count, location.absent_chance_percent
+        )?;
+    }
+    Ok(())
 }
 
 fn write_name_list(profiles: &[&MercProfile], mut output: impl Write) -> Result<(), io::Error> {

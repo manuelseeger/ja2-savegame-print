@@ -33,6 +33,10 @@ pub struct Cli {
     #[arg(long)]
     pub list_npcs: bool,
 
+    /// Print map locations for an item (currently: aluminum-rod).
+    #[arg(long, value_name = "ITEM", conflicts_with = "list_npcs")]
+    pub item: Option<String>,
+
     /// Show a character by name (repeatable; --npc is an alias).
     #[arg(long = "include-npc", visible_alias = "npc", value_name = "NAME")]
     pub include_npc: Vec<String>,

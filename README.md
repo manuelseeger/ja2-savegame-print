@@ -65,6 +65,10 @@ ja2-savegame file.sav --all-profiles
 # Print NPC nicknames and full names in two columns, without locations
 ja2-savegame file.sav --list-npcs
 
+# Show the known aluminum-rod map placements and their absent chances
+ja2-savegame file.sav --item aluminum-rod
+ja2-savegame file.sav --item "aluminum rod" --json
+
 # Output as JSON
 ja2-savegame file.sav --json
 ja2-savegame file.sav --json --pretty
@@ -75,7 +79,9 @@ ja2-savegame file.sav -vv
 ```
 
 You can inspect one save file at a time. Character selection accepts the usual
-name, full name, or nickname.
+name, full name, or nickname. `--item aluminum-rod` lists its fixed map
+placements, quantities, and map-defined absent chances; these are potential map
+placements, not a claim that an item is still present in a particular save.
 
 ## Supported savegames
 

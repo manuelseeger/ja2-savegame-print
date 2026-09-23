@@ -108,6 +108,36 @@ fn issue_3_reports_current_npc_and_rpc_sectors() {
 }
 
 #[test]
+fn aluminum_rod_locations_are_available_as_text_and_json() {
+    let output = binary()
+        .args([FIXTURE, "--item", "aluminum-rod"])
+        .output()
+        .expect("CLI should run");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Aluminum rod (item 305)"));
+    assert!(stdout
+        .lines()
+        .any(|line| line.starts_with("C5 ") && line.contains("40%")));
+    assert!(stdout
+        .lines()
+        .any(|line| line.starts_with("H3-1 ") && line.contains("30%")));
+    assert!(stdout
+        .lines()
+        .any(|line| line.starts_with("O4 ") && line.contains("30%")));
+
+    let output = binary()
+        .args([FIXTURE, "--item", "aluminum rod", "--json"])
+        .output()
+        .expect("CLI should run");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(document["item"]["item_index"], 305);
+    assert_eq!(document["item"]["locations"].as_array().unwrap().len(), 11);
+}
+
+#[test]
 fn multiple_input_paths_are_a_usage_error() {
     let output = binary()
         .args([FIXTURE, FIXTURE])
