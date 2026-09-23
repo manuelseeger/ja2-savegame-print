@@ -12,7 +12,7 @@ fn binary() -> Command {
 #[test]
 fn json_output_is_valid_and_all_profiles_returns_every_profile() {
     let output = binary()
-        .args([FIXTURE, "--json", "--all-profiles"])
+        .args([FIXTURE, "--json", "npc", "--all-profiles"])
         .output()
         .expect("CLI should run");
 
@@ -32,10 +32,11 @@ fn exclusion_filter_takes_precedence_over_include_filter() {
         .args([
             FIXTURE,
             "--json",
+            "npc",
             "--all-profiles",
-            "--npc",
+            "-i",
             "Hamous",
-            "--exclude-npc",
+            "--exclude",
             "HAMOUS",
         ])
         .output()
@@ -49,7 +50,7 @@ fn exclusion_filter_takes_precedence_over_include_filter() {
 #[test]
 fn list_npcs_prints_names_without_locations() {
     let output = binary()
-        .args([FIXTURE, "--list-npcs"])
+        .args([FIXTURE, "npc", "--list"])
         .output()
         .expect("CLI should run");
 
@@ -74,17 +75,18 @@ fn issue_3_reports_current_npc_and_rpc_sectors() {
     let output = binary()
         .args([
             ISSUE_3_FIXTURE,
-            "--npc",
+            "npc",
+            "--include",
             "Hamous",
-            "--npc",
+            "-i",
             "Dynamo",
-            "--npc",
+            "-i",
             "Ira",
-            "--npc",
+            "-i",
             "Devin",
-            "--npc",
+            "-i",
             "Carmen",
-            "--npc",
+            "-i",
             "Micky",
         ])
         .output()
@@ -110,7 +112,7 @@ fn issue_3_reports_current_npc_and_rpc_sectors() {
 #[test]
 fn aluminum_rod_locations_are_available_as_text_and_json() {
     let output = binary()
-        .args([FIXTURE, "--item", "aluminum-rod"])
+        .args([FIXTURE, "items", "-i", "aluminum-rod"])
         .output()
         .expect("CLI should run");
 
@@ -128,7 +130,7 @@ fn aluminum_rod_locations_are_available_as_text_and_json() {
         .any(|line| line.starts_with("O4 ") && line.contains("30%")));
 
     let output = binary()
-        .args([FIXTURE, "--item", "aluminum rod", "--json"])
+        .args(["--json", FIXTURE, "items", "--include", "aluminum rod"])
         .output()
         .expect("CLI should run");
     assert!(output.status.success());
@@ -138,9 +140,40 @@ fn aluminum_rod_locations_are_available_as_text_and_json() {
 }
 
 #[test]
+fn command_options_are_scoped_and_general_options_work_after_commands() {
+    let output = binary()
+        .args([FIXTURE, "npc", "--list", "--json", "--pretty"])
+        .output()
+        .expect("CLI should run");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(document["npcs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|npc| npc["nickname"] == "Hamous"));
+
+    for args in [
+        vec![FIXTURE, "items", "--all-profiles", "-i", "aluminum-rod"],
+        vec![FIXTURE, "npc", "--item", "aluminum-rod"],
+        vec![FIXTURE, "items"],
+    ] {
+        let output = binary().args(args).output().expect("CLI should run");
+        assert_eq!(output.status.code(), Some(2));
+    }
+}
+
+#[test]
+fn missing_command_is_an_error() {
+    let output = binary().arg(FIXTURE).output().expect("CLI should run");
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("a command is required"));
+}
+
+#[test]
 fn multiple_input_paths_are_a_usage_error() {
     let output = binary()
-        .args([FIXTURE, FIXTURE])
+        .args([FIXTURE, "npc", FIXTURE])
         .output()
         .expect("CLI should run");
 

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{ArgAction, Parser};
+use clap::{ArgAction, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(name = "ja2-savegame", version, about)]
@@ -10,7 +10,7 @@ pub struct Cli {
     pub source_version: bool,
 
     /// Show diagnostic details (-vv shows more).
-    #[arg(short = 'v', action = ArgAction::Count)]
+    #[arg(short = 'v', action = ArgAction::Count, global = true)]
     pub verbose: u8,
 
     /// Save file to inspect.
@@ -18,30 +18,41 @@ pub struct Cli {
     pub file: Option<PathBuf>,
 
     /// Output as JSON instead of plain text.
-    #[arg(long)]
+    #[arg(long, global = true)]
     pub json: bool,
 
     /// Pretty-print JSON (requires --json).
-    #[arg(long, requires = "json")]
+    #[arg(long, requires = "json", global = true)]
     pub pretty: bool,
 
-    /// Include every character, even those with no known name or location.
-    #[arg(long)]
-    pub all_profiles: bool,
+    #[command(subcommand)]
+    pub command: Option<Command>,
+}
 
-    /// Print NPC nicknames and full names without locations.
-    #[arg(long)]
-    pub list_npcs: bool,
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// Show NPC locations or names.
+    Npc {
+        /// Include every character, even those with no known name or location.
+        #[arg(long)]
+        all_profiles: bool,
 
-    /// Print map locations for an item (currently: aluminum-rod).
-    #[arg(long, value_name = "ITEM", conflicts_with = "list_npcs")]
-    pub item: Option<String>,
+        /// Print NPC nicknames and full names without locations.
+        #[arg(long = "list")]
+        list_npcs: bool,
 
-    /// Show a character by name (repeatable; --npc is an alias).
-    #[arg(long = "include-npc", visible_alias = "npc", value_name = "NAME")]
-    pub include_npc: Vec<String>,
+        /// Show a character by name (repeatable).
+        #[arg(short = 'i', long = "include", value_name = "NAME")]
+        include: Vec<String>,
 
-    /// Exclude a character by name (repeatable; takes precedence).
-    #[arg(long, value_name = "NAME")]
-    pub exclude_npc: Vec<String>,
+        /// Exclude a character by name (repeatable; takes precedence).
+        #[arg(long, value_name = "NAME")]
+        exclude: Vec<String>,
+    },
+    /// Show known map placements for an item.
+    Items {
+        /// Item to show (currently: aluminum-rod).
+        #[arg(short = 'i', long = "include", value_name = "ITEM", required = true)]
+        include: String,
+    },
 }
