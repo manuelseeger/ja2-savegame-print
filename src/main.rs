@@ -43,7 +43,7 @@ fn run() -> Result<(), io::Error> {
         } => Some(ja2_savegame::item::lookup(include).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("unknown item {include:?}; supported items: aluminum-rod (rod)"),
+                format!("unknown item {include:?}; supported items: aluminum-rod (rod), spring"),
             )
         })?),
         _ => None,

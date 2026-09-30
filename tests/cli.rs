@@ -151,7 +151,9 @@ fn items_without_include_shows_all_and_rod_is_an_alias() {
         .expect("CLI should run");
     assert!(all.status.success());
     assert!(rod.status.success());
-    assert_eq!(all.stdout, rod.stdout);
+    let all_text = String::from_utf8_lossy(&all.stdout);
+    assert!(all_text.starts_with(String::from_utf8_lossy(&rod.stdout).as_ref()));
+    assert!(all_text.contains("Spring (item 306)"));
 
     let all_json = binary()
         .args([FIXTURE, "items", "--json"])
@@ -159,8 +161,38 @@ fn items_without_include_shows_all_and_rod_is_an_alias() {
         .expect("CLI should run");
     assert!(all_json.status.success());
     let document: serde_json::Value = serde_json::from_slice(&all_json.stdout).unwrap();
-    assert_eq!(document["items"].as_array().unwrap().len(), 1);
+    assert_eq!(document["items"].as_array().unwrap().len(), 2);
     assert_eq!(document["items"][0]["item_index"], 305);
+    assert_eq!(document["items"][1]["item_index"], 306);
+}
+
+#[test]
+fn spring_locations_are_available_as_text_and_json() {
+    let output = binary()
+        .args([FIXTURE, "items", "--include", "spring"])
+        .output()
+        .expect("CLI should run");
+    assert!(output.status.success());
+    let text = String::from_utf8_lossy(&output.stdout);
+    assert!(text.starts_with("Spring (item 306)"));
+    assert!(text
+        .lines()
+        .any(|line| line.starts_with("G1 ") && line.contains("20%")));
+    assert!(text
+        .lines()
+        .any(|line| line.starts_with("I14-1 ") && line.contains("40%")));
+    assert!(text
+        .lines()
+        .any(|line| line.starts_with("O4 ") && line.contains("40%")));
+
+    let output = binary()
+        .args([FIXTURE, "items", "-i", "SPRING", "--json"])
+        .output()
+        .expect("CLI should run");
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(document["item"]["internal_name"], "SPRING");
+    assert_eq!(document["item"]["locations"].as_array().unwrap().len(), 10);
 }
 
 #[test]

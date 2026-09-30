@@ -65,9 +65,10 @@ ja2-savegame file.sav npc --list
 # Show all known item map placements and their absent chances
 ja2-savegame file.sav items
 
-# Show only the aluminum rod (rod is an alias)
+# Show one item (rod is an alias for aluminum-rod)
 ja2-savegame file.sav items --include aluminum-rod
 ja2-savegame file.sav items -i rod --json
+ja2-savegame file.sav items -i spring
 
 # Output as JSON (general options work before or after the command)
 ja2-savegame --json file.sav npc
@@ -80,7 +81,8 @@ ja2-savegame file.sav items -i aluminum-rod -vv
 
 You can inspect one save file at a time. Character selection accepts the usual
 name, full name, or nickname. `items` lists all known items; `items -i rod`
-selects the aluminum rod. Item output lists fixed map placements, quantities,
+selects the aluminum rod. `items -i spring` selects the spring. Item output lists
+fixed map placements, quantities,
 and map-defined absent chances; these are potential map placements, not a
 claim that an item is still present in a particular save. JSON output uses
 `items` for all items and `item` for a selected item.
