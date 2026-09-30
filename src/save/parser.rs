@@ -11,7 +11,8 @@ use super::{
     encryption,
     header::{self, SAVE_HEADER_SIZE},
     reader::Reader,
-    ParseError, SaveHeader, SupportedSaveVersion,
+    world_items::parse_sector_items,
+    ParseError, SaveHeader, SectorItems, SupportedSaveVersion,
 };
 
 const TACTICAL_STATUS_AND_SECTOR_SIZE: usize = 316 + 5;
@@ -20,7 +21,8 @@ const STRATEGIC_EVENT_SIZE: usize = 28;
 const LAPTOP_FIXED_SIZE: usize = 7_440;
 const BOBBY_RAY_ORDER_SIZE: usize = 84;
 const INSURANCE_PAYOUT_SIZE: usize = 8;
-const TOTAL_SOLDIERS: usize = 148;
+// Overhead_Types.h: MAX_NUM_SOLDIERS (148) + NUM_PLANNING_MERCS (8).
+const TOTAL_SOLDIERS: usize = 156;
 const SOLDIER_TYPE_SIZE: usize = 2_328;
 const SOLDIER_PROFILE_ID_OFFSET: usize = 1_825;
 const SOLDIER_SECTOR_OFFSET: usize = 1_922;
@@ -32,8 +34,19 @@ pub struct SaveAnalysis {
     pub file: String,
     pub header: SaveHeader,
     pub profiles: Vec<MercProfile>,
+    pub sector_items: Vec<SectorItems>,
     #[serde(skip)]
     pub sections: Vec<SectionTrace>,
+}
+
+impl SaveAnalysis {
+    /// Ground item stack quantity in this sector. No saved item data is unknown.
+    pub fn sector_item_count(&self, sector: &Sector, item_index: u16) -> Option<u64> {
+        self.sector_items
+            .iter()
+            .find(|entry| &entry.sector == sector)?
+            .count(item_index)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -123,11 +136,13 @@ pub fn analyze_bytes(path: &Path, bytes: &[u8]) -> Result<SaveAnalysis, ParseErr
     });
 
     apply_active_soldier_locations(&mut reader, &mut sections, &mut profiles, context)?;
+    let sector_items = parse_sector_items(&mut reader, &mut sections)?;
 
     Ok(SaveAnalysis {
         file: path.to_string_lossy().into_owned(),
         header,
         profiles,
+        sector_items,
         sections,
     })
 }

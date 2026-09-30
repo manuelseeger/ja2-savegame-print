@@ -3,7 +3,7 @@ use std::{io, process::ExitCode};
 use clap::Parser;
 use ja2_savegame::{
     analyze_file,
-    cli::Cli,
+    cli::{Cli, Command},
     output::{write_output, OutputOptions},
     save::STRACCIATELLA_SOURCE_COMMIT,
 };
@@ -30,7 +30,28 @@ fn run() -> Result<(), io::Error> {
         .file
         .as_deref()
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "a save file is required"))?;
+    let command = cli.command.ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "a command is required: npc or items",
+        )
+    })?;
     let analysis = analyze_file(file).map_err(io::Error::other)?;
+    let item = match &command {
+        Command::Items {
+            include: Some(include),
+        } => Some(ja2_savegame::item::lookup(include).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("unknown item {include:?}; supported items: aluminum-rod (rod), spring"),
+            )
+        })?),
+        _ => None,
+    };
+    let items = match &command {
+        Command::Items { include: None } => Some(ja2_savegame::item::all()),
+        _ => None,
+    };
     if cli.verbose > 0 {
         for section in &analysis.sections {
             if cli.verbose > 1 {
@@ -46,15 +67,31 @@ fn run() -> Result<(), io::Error> {
             }
         }
     }
+    let (all_profiles, list_npcs, include, exclude) = match &command {
+        Command::Npc {
+            all_profiles,
+            list_npcs,
+            include,
+            exclude,
+        } => (
+            *all_profiles,
+            *list_npcs,
+            include.as_slice(),
+            exclude.as_slice(),
+        ),
+        Command::Items { .. } => (false, false, &[][..], &[][..]),
+    };
     write_output(
         &analysis,
         &OutputOptions {
             json: cli.json,
             pretty: cli.pretty,
-            all_profiles: cli.all_profiles,
-            list_npcs: cli.list_npcs,
-            include: &cli.include_npc,
-            exclude: &cli.exclude_npc,
+            all_profiles,
+            list_npcs,
+            item: item.as_ref(),
+            items: items.as_deref(),
+            include,
+            exclude,
         },
         io::stdout().lock(),
     )

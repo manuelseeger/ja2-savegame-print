@@ -28,19 +28,19 @@ Inspect one savegame:
 ### Linux
 
 ```sh
-./ja2-savegame /path/to/savegame.sav
+./ja2-savegame /path/to/savegame.sav npc
 ```
 
 ### macOS
 
 ```sh
-./ja2-savegame /path/to/savegame.sav
+./ja2-savegame /path/to/savegame.sav npc
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-.\ja2-savegame-windows-x86_64.exe C:\path\to\savegame.sav
+.\ja2-savegame-windows-x86_64.exe C:\path\to\savegame.sav npc
 ```
 
 By default, the tool lists characters from the original game whose location is
@@ -51,31 +51,50 @@ recorded in the save. Sectors use the familiar JA2 notation, such as `O4` or
 
 ```sh
 # Show only selected characters (repeatable; capitalization does not matter)
-ja2-savegame file.sav --npc Hamous --npc Skyrider
+ja2-savegame file.sav npc --include Hamous -i Skyrider
 
-# --include-npc is the longer form of --npc
-ja2-savegame file.sav --include-npc Devin
-
-# Exclude a character, even when also selected with --npc
-ja2-savegame file.sav --exclude-npc Carmen
+# Exclude a character, even when also selected with --include
+ja2-savegame file.sav npc --include Carmen --exclude Carmen
 
 # Include every character, even those with no known name or location
-ja2-savegame file.sav --all-profiles
+ja2-savegame file.sav npc --all-profiles
 
 # Print NPC nicknames and full names in two columns, without locations
-ja2-savegame file.sav --list-npcs
+ja2-savegame file.sav npc --list
 
-# Output as JSON
-ja2-savegame file.sav --json
-ja2-savegame file.sav --json --pretty
+# Show all known item map placements and their absent chances
+ja2-savegame file.sav items
+
+# Show one item (rod is an alias for aluminum-rod)
+ja2-savegame file.sav items --include aluminum-rod
+ja2-savegame file.sav items -i rod --json
+ja2-savegame file.sav items -i spring
+
+# Output as JSON (general options work before or after the command)
+ja2-savegame --json file.sav npc
+ja2-savegame file.sav npc --json --pretty
 
 # Show diagnostic details (-vv shows more)
-ja2-savegame file.sav -v
-ja2-savegame file.sav -vv
+ja2-savegame file.sav npc -v
+ja2-savegame file.sav items -i aluminum-rod -vv
 ```
 
 You can inspect one save file at a time. Character selection accepts the usual
-name, full name, or nickname.
+name, full name, or nickname. `items` lists all known items; `items -i rod`
+selects the aluminum rod. `items -i spring` selects the spring. Item output lists
+fixed map placements, quantities, and map-defined absent chances. The `Found`
+column shows the total quantity of that item still on the ground in each sector,
+from the save's sector item records. It includes hidden items and stacks, but
+not items carried by characters. `0` means saved item data confirms none remain;
+a blank means the save has no item data for that sector. Finding an item does
+not require that your mercs have seen it.
+
+Map counts and absent chances describe potential placements, not the current
+save. When a sector has multiple placement rows, each row shows the same sector
+total in `Found`; do not add those totals together. Items saved in other sectors
+also appear, with blank map count and absent chance columns.
+JSON output uses `items` for all items and `item` for a selected item. Each
+location has a `found` quantity, or `null` when no saved sector item data exists.
 
 ## Supported savegames
 
@@ -107,7 +126,7 @@ placed, dead, unavailable, or recruited.
 
 - Stock NPC/RPC classification comes from Stracciatella's stock profile
   metadata. Unknown or modded profile IDs are not classified as stock NPCs;
-  use `--all-profiles` to inspect them.
+  use `npc --all-profiles` to inspect them.
 - Saved names and nicknames are used for display because the original stock
   display strings come from the licensed game data.
 - Parsing intentionally stops after all merc profiles have been structurally
