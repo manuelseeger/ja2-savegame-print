@@ -221,7 +221,9 @@ fn parse_items(reader: &Reader<'_>, payload: &[u8]) -> Result<Vec<SavedWorldItem
         )));
     }
     Ok(payload[4..]
-        .chunks_exact(WORLD_ITEM_SIZE)
+        .as_chunks::<WORLD_ITEM_SIZE>()
+        .0
+        .iter()
         .map(|record| SavedWorldItem {
             exists: record[0] != 0,
             grid_no: i16::from_le_bytes([record[2], record[3]]),
