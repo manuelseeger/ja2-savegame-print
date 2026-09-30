@@ -18,9 +18,13 @@ pub struct Item {
     pub locations: Vec<ItemLocation>,
 }
 
+pub fn all() -> Vec<Item> {
+    vec![lookup("aluminum-rod").expect("known item")]
+}
+
 pub fn lookup(name: &str) -> Option<Item> {
     let normalized = name.trim().to_ascii_lowercase().replace([' ', '_'], "-");
-    if !["aluminum-rod", "aluminium-rod"].contains(&normalized.as_str()) {
+    if !["aluminum-rod", "aluminium-rod", "rod"].contains(&normalized.as_str()) {
         return None;
     }
 
@@ -75,6 +79,13 @@ mod tests {
     #[test]
     fn item_names_are_case_and_separator_insensitive() {
         assert!(lookup("ALUMINUM_ROD").is_some());
+        assert_eq!(lookup(" ROD ").unwrap().item_index, 305);
         assert!(lookup("unknown").is_none());
+    }
+
+    #[test]
+    fn all_items_contains_aluminum_rod() {
+        assert_eq!(super::all().len(), 1);
+        assert_eq!(super::all()[0].item_index, 305);
     }
 }

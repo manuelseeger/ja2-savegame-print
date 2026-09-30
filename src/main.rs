@@ -38,15 +38,19 @@ fn run() -> Result<(), io::Error> {
     })?;
     let analysis = analyze_file(file).map_err(io::Error::other)?;
     let item = match &command {
-        Command::Items { include } => {
-            Some(ja2_savegame::item::lookup(include).ok_or_else(|| {
-                io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("unknown item {include:?}; supported items: aluminum-rod"),
-                )
-            })?)
-        }
-        Command::Npc { .. } => None,
+        Command::Items {
+            include: Some(include),
+        } => Some(ja2_savegame::item::lookup(include).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("unknown item {include:?}; supported items: aluminum-rod (rod)"),
+            )
+        })?),
+        _ => None,
+    };
+    let items = match &command {
+        Command::Items { include: None } => Some(ja2_savegame::item::all()),
+        _ => None,
     };
     if cli.verbose > 0 {
         for section in &analysis.sections {
@@ -85,6 +89,7 @@ fn run() -> Result<(), io::Error> {
             all_profiles,
             list_npcs,
             item: item.as_ref(),
+            items: items.as_deref(),
             include,
             exclude,
         },

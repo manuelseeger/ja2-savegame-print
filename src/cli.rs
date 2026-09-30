@@ -51,8 +51,8 @@ pub enum Command {
     },
     /// Show known map placements for an item.
     Items {
-        /// Item to show (currently: aluminum-rod).
-        #[arg(short = 'i', long = "include", value_name = "ITEM", required = true)]
-        include: String,
+        /// Item to show (currently: aluminum-rod or rod). Omit to show all items.
+        #[arg(short = 'i', long = "include", value_name = "ITEM")]
+        include: Option<String>,
     },
 }

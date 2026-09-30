@@ -140,6 +140,30 @@ fn aluminum_rod_locations_are_available_as_text_and_json() {
 }
 
 #[test]
+fn items_without_include_shows_all_and_rod_is_an_alias() {
+    let all = binary()
+        .args([FIXTURE, "items"])
+        .output()
+        .expect("CLI should run");
+    let rod = binary()
+        .args([FIXTURE, "items", "-i", "rod"])
+        .output()
+        .expect("CLI should run");
+    assert!(all.status.success());
+    assert!(rod.status.success());
+    assert_eq!(all.stdout, rod.stdout);
+
+    let all_json = binary()
+        .args([FIXTURE, "items", "--json"])
+        .output()
+        .expect("CLI should run");
+    assert!(all_json.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&all_json.stdout).unwrap();
+    assert_eq!(document["items"].as_array().unwrap().len(), 1);
+    assert_eq!(document["items"][0]["item_index"], 305);
+}
+
+#[test]
 fn command_options_are_scoped_and_general_options_work_after_commands() {
     let output = binary()
         .args([FIXTURE, "npc", "--list", "--json", "--pretty"])
@@ -156,7 +180,6 @@ fn command_options_are_scoped_and_general_options_work_after_commands() {
     for args in [
         vec![FIXTURE, "items", "--all-profiles", "-i", "aluminum-rod"],
         vec![FIXTURE, "npc", "--item", "aluminum-rod"],
-        vec![FIXTURE, "items"],
     ] {
         let output = binary().args(args).output().expect("CLI should run");
         assert_eq!(output.status.code(), Some(2));

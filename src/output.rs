@@ -10,6 +10,7 @@ pub struct OutputOptions<'a> {
     pub all_profiles: bool,
     pub list_npcs: bool,
     pub item: Option<&'a Item>,
+    pub items: Option<&'a [Item]>,
     pub include: &'a [String],
     pub exclude: &'a [String],
 }
@@ -47,7 +48,28 @@ pub fn write_output(
     options: &OutputOptions<'_>,
     mut output: impl Write,
 ) -> Result<(), io::Error> {
-    let profiles = selected_profiles(analysis, options);
+    if let Some(items) = options.items {
+        if options.json {
+            let document = ItemsDocument {
+                file: &analysis.file,
+                items,
+            };
+            if options.pretty {
+                serde_json::to_writer_pretty(&mut output, &document)?;
+            } else {
+                serde_json::to_writer(&mut output, &document)?;
+            }
+            writeln!(output)?;
+        } else {
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    writeln!(output)?;
+                }
+                write_item(item, &mut output)?;
+            }
+        }
+        return Ok(());
+    }
     if let Some(item) = options.item {
         if options.json {
             let document = ItemDocument {
@@ -65,6 +87,7 @@ pub fn write_output(
         }
         return Ok(());
     }
+    let profiles = selected_profiles(analysis, options);
     if options.json {
         if options.list_npcs {
             let entries = sorted_name_list_entries(&profiles);
@@ -109,6 +132,12 @@ pub fn write_output(
 struct ItemDocument<'a> {
     file: &'a str,
     item: &'a Item,
+}
+
+#[derive(Serialize)]
+struct ItemsDocument<'a> {
+    file: &'a str,
+    items: &'a [Item],
 }
 
 #[derive(Serialize)]
