@@ -119,6 +119,8 @@ fn aluminum_rod_locations_are_available_as_text_and_json() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Aluminum rod (item 305)"));
+    assert!(stdout.contains("Sector  Count  Absent chance  Found"));
+    assert!(!stdout.contains("unknown"));
     assert!(stdout
         .lines()
         .any(|line| line.starts_with("C5 ") && line.contains("40%")));
@@ -136,7 +138,11 @@ fn aluminum_rod_locations_are_available_as_text_and_json() {
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(document["item"]["item_index"], 305);
-    assert_eq!(document["item"]["locations"].as_array().unwrap().len(), 11);
+    let locations = document["item"]["locations"].as_array().unwrap();
+    assert!(locations.len() >= 11);
+    assert!(locations
+        .iter()
+        .all(|location| location.get("found").is_some()));
 }
 
 #[test]
@@ -192,7 +198,11 @@ fn spring_locations_are_available_as_text_and_json() {
     assert!(output.status.success());
     let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(document["item"]["internal_name"], "SPRING");
-    assert_eq!(document["item"]["locations"].as_array().unwrap().len(), 10);
+    let locations = document["item"]["locations"].as_array().unwrap();
+    assert!(locations.len() >= 10);
+    assert!(locations
+        .iter()
+        .all(|location| location.get("found").is_some()));
 }
 
 #[test]

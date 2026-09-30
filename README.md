@@ -82,10 +82,19 @@ ja2-savegame file.sav items -i aluminum-rod -vv
 You can inspect one save file at a time. Character selection accepts the usual
 name, full name, or nickname. `items` lists all known items; `items -i rod`
 selects the aluminum rod. `items -i spring` selects the spring. Item output lists
-fixed map placements, quantities,
-and map-defined absent chances; these are potential map placements, not a
-claim that an item is still present in a particular save. JSON output uses
-`items` for all items and `item` for a selected item.
+fixed map placements, quantities, and map-defined absent chances. The `Found`
+column shows the total quantity of that item still on the ground in each sector,
+from the save's sector item records. It includes hidden items and stacks, but
+not items carried by characters. `0` means saved item data confirms none remain;
+a blank means the save has no item data for that sector. Finding an item does
+not require that your mercs have seen it.
+
+Map counts and absent chances describe potential placements, not the current
+save. When a sector has multiple placement rows, each row shows the same sector
+total in `Found`; do not add those totals together. Items saved in other sectors
+also appear, with blank map count and absent chance columns.
+JSON output uses `items` for all items and `item` for a selected item. Each
+location has a `found` quantity, or `null` when no saved sector item data exists.
 
 ## Supported savegames
 

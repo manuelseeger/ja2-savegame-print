@@ -3,12 +3,16 @@ pub mod header;
 mod parser;
 pub mod reader;
 mod version;
+mod world_items;
+#[cfg(test)]
+mod world_items_tests;
 
 use std::path::PathBuf;
 
 pub use header::SaveHeader;
 pub use parser::{analyze_bytes, analyze_file, SaveAnalysis, SectionTrace};
 pub use version::{SupportedSaveVersion, STRACCIATELLA_SOURCE_COMMIT, SUPPORTED_VERSION_TEXT};
+pub use world_items::{SavedWorldItem, SectorItems};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
