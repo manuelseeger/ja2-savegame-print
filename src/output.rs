@@ -255,6 +255,13 @@ fn item_with_counts<'a>(item: &'a Item, counts: &[(crate::sector::Sector, u64)])
 
 fn write_item(item: &SavedItem<'_>, mut output: impl Write) -> Result<(), io::Error> {
     writeln!(output, "{} (item {})", item.name, item.item_index)?;
+    if item.locations.is_empty() {
+        writeln!(
+            output,
+            "No fixed map placements or saved ground items found."
+        )?;
+        return Ok(());
+    }
     writeln!(output, "Sector  Count  Absent chance  Found")?;
     for location in &item.locations {
         let sector = location
@@ -423,6 +430,29 @@ mod tests {
         assert_eq!(extra["found"], 2);
         assert!(extra["count"].is_null());
         assert!(extra["absent_chance_percent"].is_null());
+    }
+
+    #[test]
+    fn lame_boy_without_map_placements_shows_saved_counts() {
+        let item = crate::item::lookup("lame-boy").unwrap();
+        let empty = item_with_counts(&item, &[]);
+        let mut text = Vec::new();
+        write_item(&empty, &mut text).unwrap();
+        assert!(String::from_utf8(text)
+            .unwrap()
+            .contains("No fixed map placements or saved ground items found."));
+        let saved = item_with_counts(&item, &[(Sector::new(1, 1, 0), 2)]);
+        assert_eq!(saved.locations.len(), 1);
+        assert_eq!(saved.locations[0].found, Some(2));
+        assert_eq!(saved.locations[0].count, None);
+        let mut text = Vec::new();
+        write_item(&saved, &mut text).unwrap();
+        assert!(String::from_utf8(text)
+            .unwrap()
+            .lines()
+            .any(|line| { line.split_whitespace().collect::<Vec<_>>() == ["A1", "2"] }));
+        let json = serde_json::to_value(saved).unwrap();
+        assert_eq!(json["locations"][0]["found"], 2);
     }
 
     #[test]

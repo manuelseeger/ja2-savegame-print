@@ -81,7 +81,10 @@ ja2-savegame file.sav items -i aluminum-rod -vv
 
 You can inspect one save file at a time. Character selection accepts the usual
 name, full name, or nickname. `items` lists all known items; `items -i rod`
-selects the aluminum rod. `items -i spring` selects the spring. Item output lists
+selects the aluminum rod. Supported items are Aluminum rod, Spring, Lame boy,
+Steel rod, Fumble pak, X-ray bulb, and Copper wire. Item names are case-insensitive;
+spaces, hyphens, and underscores can be used as separators. Internal names such
+as `XRAY_BULB` also work. Item output lists
 fixed map placements, quantities, and map-defined absent chances. The `Found`
 column shows the total quantity of that item still on the ground in each sector,
 from the save's sector item records. It includes hidden items and stacks, but
@@ -90,7 +93,10 @@ a blank means the save has no item data for that sector. Finding an item does
 not require that your mercs have seen it.
 
 Map counts and absent chances describe potential placements, not the current
-save. When a sector has multiple placement rows, each row shows the same sector
+save. Lame boy has no fixed placement in the original map archive, but saved
+quantities are still shown. Steel rod and Copper wire placements in `J9-1`
+exist only when the Sci-Fi option is off, when Tixa basement uses `J9_B1_A.DAT`.
+When a sector has multiple placement rows, each row shows the same sector
 total in `Found`; do not add those totals together. Items saved in other sectors
 also appear, with blank map count and absent chance columns.
 JSON output uses `items` for all items and `item` for a selected item. Each

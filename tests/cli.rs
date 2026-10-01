@@ -167,9 +167,10 @@ fn items_without_include_shows_all_and_rod_is_an_alias() {
         .expect("CLI should run");
     assert!(all_json.status.success());
     let document: serde_json::Value = serde_json::from_slice(&all_json.stdout).unwrap();
-    assert_eq!(document["items"].as_array().unwrap().len(), 2);
-    assert_eq!(document["items"][0]["item_index"], 305);
-    assert_eq!(document["items"][1]["item_index"], 306);
+    assert_eq!(document["items"].as_array().unwrap().len(), 7);
+    for (index, id) in [305, 306, 315, 308, 318, 319, 316].iter().enumerate() {
+        assert_eq!(document["items"][index]["item_index"], *id);
+    }
 }
 
 #[test]
@@ -203,6 +204,37 @@ fn spring_locations_are_available_as_text_and_json() {
     assert!(locations
         .iter()
         .all(|location| location.get("found").is_some()));
+}
+
+#[test]
+fn components_are_available_as_text_and_json() {
+    for (alias, name, internal_name, id) in [
+        ("lame-boy", "Lame boy", "LAME_BOY", 315),
+        ("STEEL_ROD", "Steel rod", "STEEL_ROD", 308),
+        ("Fumble pak", "Fumble pak", "FUMBLE_PAK", 318),
+        ("X-ray bulb", "X-ray bulb", "XRAY_BULB", 319),
+        ("copper_wire", "Copper wire", "COPPER_WIRE", 316),
+    ] {
+        let output = binary()
+            .args([FIXTURE, "items", "-i", alias])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{alias}");
+        assert!(String::from_utf8_lossy(&output.stdout).starts_with(&format!("{name} (item {id})")));
+        let output = binary()
+            .args([FIXTURE, "items", "-i", internal_name, "--json"])
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "{internal_name}");
+        let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(document["item"]["item_index"], id);
+        assert_eq!(document["item"]["internal_name"], internal_name);
+        assert!(document["item"]["locations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|location| location.get("found").is_some()));
+    }
 }
 
 #[test]
