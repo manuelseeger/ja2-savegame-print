@@ -19,14 +19,31 @@ pub struct Item {
 }
 
 pub fn all() -> Vec<Item> {
-    vec![aluminum_rod(), spring()]
+    vec![
+        aluminum_rod(),
+        spring(),
+        lame_boy(),
+        steel_rod(),
+        fumble_pak(),
+        xray_bulb(),
+        copper_wire(),
+    ]
 }
 
 pub fn lookup(name: &str) -> Option<Item> {
-    let normalized = name.trim().to_ascii_lowercase().replace([' ', '_'], "-");
+    let normalized = name
+        .chars()
+        .filter(|c| !c.is_whitespace() && *c != '_' && *c != '-')
+        .collect::<String>()
+        .to_ascii_lowercase();
     match normalized.as_str() {
-        "aluminum-rod" | "aluminium-rod" | "rod" => Some(aluminum_rod()),
+        "aluminumrod" | "aluminiumrod" | "rod" => Some(aluminum_rod()),
         "spring" => Some(spring()),
+        "lameboy" => Some(lame_boy()),
+        "steelrod" => Some(steel_rod()),
+        "fumblepak" => Some(fumble_pak()),
+        "xraybulb" => Some(xray_bulb()),
+        "copperwire" => Some(copper_wire()),
         _ => None,
     }
 }
@@ -64,6 +81,53 @@ fn spring() -> Item {
         (4, 15, 0, 2, 40),  // O4
     ];
     item("Spring", "SPRING", 306, &placements)
+}
+
+fn lame_boy() -> Item {
+    // No fixed placement in Maps.slf, including alternate maps.
+    item("Lame boy", "LAME_BOY", 315, &[])
+}
+
+fn steel_rod() -> Item {
+    let placements = [
+        (1, 7, 0, 1, 30),   // G1
+        (2, 7, 0, 1, 50),   // G2
+        (1, 8, 0, 1, 40),   // H1
+        (3, 8, 0, 1, 40),   // H3
+        (6, 9, 0, 1, 20),   // I6
+        (6, 9, 0, 1, 30),   // I6 (separate absent chance)
+        (14, 9, 0, 1, 40),  // I14
+        (9, 10, 1, 1, 20),  // J9 basement, Sci-Fi off (J9_B1_A.DAT)
+        (10, 12, 0, 1, 40), // L10
+        (11, 12, 0, 1, 40), // L11
+    ];
+    item("Steel rod", "STEEL_ROD", 308, &placements)
+}
+
+fn fumble_pak() -> Item {
+    item("Fumble pak", "FUMBLE_PAK", 318, &[(11, 12, 0, 1, 30)]) // L11
+}
+
+fn xray_bulb() -> Item {
+    let placements = [
+        (8, 6, 0, 3, 30),  // F8
+        (4, 15, 0, 2, 40), // O4
+    ];
+    item("X-ray bulb", "XRAY_BULB", 319, &placements)
+}
+
+fn copper_wire() -> Item {
+    let placements = [
+        (2, 2, 0, 1, 30),   // B2
+        (6, 3, 0, 1, 30),   // C6
+        (8, 6, 0, 1, 10),   // F8
+        (8, 7, 0, 1, 50),   // G8
+        (9, 10, 1, 1, 20),  // J9 basement, Sci-Fi off (J9_B1_A.DAT)
+        (10, 12, 0, 1, 30), // L10
+        (11, 12, 0, 1, 40), // L11
+        (4, 15, 0, 2, 40),  // O4
+    ];
+    item("Copper wire", "COPPER_WIRE", 316, &placements)
 }
 
 fn item(
@@ -145,11 +209,84 @@ mod tests {
     }
 
     #[test]
-    fn all_items_contains_rod_and_spring() {
+    fn component_locations_match_original_maps() {
+        let cases = [
+            ("LAME_BOY", 315, vec![]),
+            (
+                "STEEL_ROD",
+                308,
+                vec![
+                    (1, 7, 0, 1, 30),
+                    (2, 7, 0, 1, 50),
+                    (1, 8, 0, 1, 40),
+                    (3, 8, 0, 1, 40),
+                    (6, 9, 0, 1, 20),
+                    (6, 9, 0, 1, 30),
+                    (14, 9, 0, 1, 40),
+                    (9, 10, 1, 1, 20),
+                    (10, 12, 0, 1, 40),
+                    (11, 12, 0, 1, 40),
+                ],
+            ),
+            ("FUMBLE_PAK", 318, vec![(11, 12, 0, 1, 30)]),
+            ("XRAY_BULB", 319, vec![(8, 6, 0, 3, 30), (4, 15, 0, 2, 40)]),
+            (
+                "COPPER_WIRE",
+                316,
+                vec![
+                    (2, 2, 0, 1, 30),
+                    (6, 3, 0, 1, 30),
+                    (8, 6, 0, 1, 10),
+                    (8, 7, 0, 1, 50),
+                    (9, 10, 1, 1, 20),
+                    (10, 12, 0, 1, 30),
+                    (11, 12, 0, 1, 40),
+                    (4, 15, 0, 2, 40),
+                ],
+            ),
+        ];
+        for (name, id, expected) in cases {
+            let item = lookup(name).unwrap();
+            assert_eq!(item.item_index, id);
+            assert_eq!(item.internal_name, name);
+            let actual = item
+                .locations
+                .iter()
+                .map(|location| {
+                    (
+                        location.sector.x,
+                        location.sector.y,
+                        location.sector.z,
+                        location.count,
+                        location.absent_chance_percent,
+                    )
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(actual, expected, "{name}");
+        }
+    }
+
+    #[test]
+    fn component_aliases_ignore_case_and_separators() {
+        for (names, id) in [
+            (["Lame boy", "LAME_BOY", "lame-boy"], 315),
+            (["Steel rod", "STEEL_ROD", "steel-rod"], 308),
+            (["Fumble pak", "FUMBLE_PAK", "fumble-pak"], 318),
+            (["X-ray bulb", "XRAY_BULB", "x_ray-bulb"], 319),
+            (["Copper wire", "COPPER_WIRE", "copper-wire"], 316),
+        ] {
+            for name in names {
+                assert_eq!(lookup(name).unwrap().item_index, id, "{name}");
+            }
+        }
+    }
+
+    #[test]
+    fn all_items_contains_every_supported_item() {
         let items = super::all();
         assert_eq!(
             items.iter().map(|item| item.item_index).collect::<Vec<_>>(),
-            vec![305, 306]
+            vec![305, 306, 315, 308, 318, 319, 316]
         );
     }
 }
