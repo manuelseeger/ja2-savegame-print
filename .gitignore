@@ -23,3 +23,5 @@ target
 docs/agents/
 .agents/
 .pi/
+references/
+NOTES-AGENT.md
