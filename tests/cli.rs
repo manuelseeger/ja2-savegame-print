@@ -71,6 +71,94 @@ fn list_npcs_prints_names_without_locations() {
 }
 
 #[test]
+fn terrorists_are_listed_by_dossier_name_with_saved_locations() {
+    let output = binary().args([FIXTURE, "--json", "npc"]).output().unwrap();
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let profiles = document["npcs"].as_array().unwrap();
+    for (id, name, sector) in [
+        (64, "Slay", Some("G8")),
+        (82, "Matron", Some("L11")),
+        (83, "Imposter", None),
+        (110, "Tiffany", None),
+        (111, "Rexall", None),
+        (112, "Elgin", Some("H2")),
+    ] {
+        let profile = profiles.iter().find(|p| p["profile_id"] == id).unwrap();
+        assert_eq!(profile["terrorist_name"], name);
+        assert_eq!(profile["sector"]["name"].as_str(), sector);
+        if sector.is_none() {
+            assert_eq!(profile["location_state"], "not_currently_placed");
+        }
+    }
+    let elgin = profiles.iter().find(|p| p["profile_id"] == 112).unwrap();
+    assert_eq!(elgin["name"], "Druggist");
+    assert_eq!(elgin["nickname"], "Charlie");
+
+    let output = binary().args([FIXTURE, "npc"]).output().unwrap();
+    let text = String::from_utf8(output.stdout).unwrap();
+    for name in ["Slay", "Matron", "Imposter", "Tiffany", "Rexall", "Elgin"] {
+        assert!(text.lines().any(|line| line.trim_start().starts_with(name)));
+    }
+    assert!(text.lines().any(|line| line.contains("Rexall")
+        && line.contains("N/A")
+        && line.contains("not currently placed")));
+}
+
+#[test]
+fn terrorist_filters_accept_dossier_and_saved_names() {
+    for alias in ["elgin", "DRUGGIST", "Charlie"] {
+        let output = binary()
+            .args([FIXTURE, "--json", "npc", "--include", alias])
+            .output()
+            .unwrap();
+        assert!(output.status.success());
+        let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        let profiles = document["npcs"].as_array().unwrap();
+        assert_eq!(profiles.len(), 1);
+        assert_eq!(profiles[0]["profile_id"], 112);
+    }
+    let output = binary()
+        .args([
+            FIXTURE,
+            "--json",
+            "npc",
+            "--include",
+            "Rexall",
+            "--exclude",
+            "Jasmin",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(document["npcs"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn terrorist_name_list_uses_dossier_names_and_preserves_saved_full_names() {
+    let output = binary()
+        .args([FIXTURE, "--json", "npc", "--list"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let entries = document["npcs"].as_array().unwrap();
+    for (name, saved) in [
+        ("Slay", "Slay"),
+        ("Matron", "MoM"),
+        ("Imposter", "Imposter"),
+        ("Tiffany", "Tiffany"),
+        ("Rexall", "T-Rex"),
+        ("Elgin", "Druggist"),
+    ] {
+        assert!(entries
+            .iter()
+            .any(|p| p["nickname"] == name && p["full_name"] == saved));
+    }
+}
+
+#[test]
 fn issue_3_reports_current_npc_and_rpc_sectors() {
     let output = binary()
         .args([

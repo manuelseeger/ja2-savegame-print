@@ -23,6 +23,32 @@ fn supported_fixture_parses_all_profiles_structurally() {
 }
 
 #[test]
+fn dead_terrorists_remain_visible_without_including_other_dead_npcs() {
+    use ja2_savegame::{
+        output::{selected_profiles, OutputOptions},
+        profile::LocationState,
+    };
+
+    let mut analysis = analyze_file(Path::new(FIXTURE)).unwrap();
+    for profile in &mut analysis.profiles {
+        profile.location_state = LocationState::Dead;
+    }
+    let options = OutputOptions {
+        json: false,
+        pretty: false,
+        all_profiles: false,
+        list_npcs: false,
+        item: None,
+        items: None,
+        include: &[],
+        exclude: &[],
+    };
+    let selected = selected_profiles(&analysis, &options);
+    assert_eq!(selected.len(), 6);
+    assert!(selected.iter().all(|p| p.terrorist_name.is_some()));
+}
+
+#[test]
 fn version_103_uses_the_reviewed_identical_pre_profile_layout() {
     let mut bytes = fs::read(FIXTURE).expect("fixture should be readable");
     bytes[..4].copy_from_slice(&103u32.to_le_bytes());

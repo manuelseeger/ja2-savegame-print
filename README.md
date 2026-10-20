@@ -44,8 +44,11 @@ Inspect one savegame:
 ```
 
 By default, the tool lists characters from the original game whose location is
-recorded in the save. Sectors use the familiar JA2 notation, such as `O4` or
-`A9-2` for underground locations. The saved coordinates are also shown.
+recorded in the save. All six of Carmen's terrorist targets are included, even
+when dead or not currently placed. They use their dossier names: Slay, Matron,
+Imposter, Tiffany, Rexall, and Elgin. Sectors use the familiar JA2 notation, such
+as `O4` or `A9-2` for underground locations. The saved coordinates are also shown;
+`N/A` means that the saved coordinates do not identify a valid sector.
 
 ### Options
 
@@ -127,8 +130,10 @@ placed, dead, unavailable, or recruited.
 - Stock NPC/RPC classification comes from Stracciatella's stock profile
   metadata. Unknown or modded profile IDs are not classified as stock NPCs;
   use `npc --all-profiles` to inspect them.
-- Saved names and nicknames are used for display because the original stock
-  display strings come from the licensed game data.
+- Saved names and nicknames are used for display, except for terrorists, which
+  use dossier names. Name filters also accept their saved names, nicknames, and
+  canonical stock names. JSON retains the saved names and adds `terrorist_name`.
+  The NPC name list uses dossier names in the nickname column for terrorists.
 - Parsing intentionally stops after all merc profiles have been structurally
   decoded and checksum-validated. Later save sections are unnecessary for NPC
   location analysis.

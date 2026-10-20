@@ -5,7 +5,7 @@ use crate::{
     sector::Sector,
 };
 
-use super::ids::{stock_npc_or_rpc, StockProfileType};
+use super::ids::{stock_npc_or_rpc, terrorist_name, StockProfileType};
 
 /// Stracciatella: `MERC_PROFILE_SIZE` in LoadSaveMercProfile.h.
 pub const MERC_PROFILE_SIZE: usize = 716;
@@ -39,6 +39,8 @@ pub struct MercProfile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub canonical_name: Option<&'static str>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub terrorist_name: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub profile_type: Option<ProfileType>,
     pub sector: Sector,
     pub location_state: LocationState,
@@ -65,7 +67,9 @@ impl MercProfile {
 
     pub fn matches_name(&self, needle: &str) -> bool {
         let needle = needle.trim().to_lowercase();
-        self.name.to_lowercase() == needle
+        self.terrorist_name
+            .is_some_and(|name| name.to_lowercase() == needle)
+            || self.name.to_lowercase() == needle
             || self
                 .nickname
                 .as_deref()
@@ -76,7 +80,9 @@ impl MercProfile {
     }
 
     pub fn display_name(&self) -> &str {
-        if !self.name.is_empty() {
+        if let Some(name) = self.terrorist_name {
+            name
+        } else if !self.name.is_empty() {
             &self.name
         } else if let Some(nickname) = &self.nickname {
             nickname
@@ -251,6 +257,7 @@ pub fn parse_profile(decoded: &[u8], profile_id: u8) -> Result<MercProfile, Pars
         name,
         nickname,
         canonical_name: stock.map(|s| s.canonical_name),
+        terrorist_name: terrorist_name(profile_id),
         profile_type,
         sector,
         location_state,
