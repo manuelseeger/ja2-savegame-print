@@ -25,7 +25,9 @@ pub fn selected_profiles<'a>(
         .filter(|profile| {
             options.all_profiles
                 || (profile.is_stock_npc_or_rpc()
-                    && (options.list_npcs || profile.has_meaningful_location()))
+                    && (options.list_npcs
+                        || profile.terrorist_name.is_some()
+                        || profile.has_meaningful_location()))
         })
         .filter(|profile| {
             options.include.is_empty()
@@ -173,8 +175,8 @@ fn sorted_name_list_entries<'a>(profiles: &'a [&'a MercProfile]) -> Vec<NameList
         .iter()
         .map(|profile| NameListEntry {
             nickname: profile
-                .nickname
-                .as_deref()
+                .terrorist_name
+                .or(profile.nickname.as_deref())
                 .unwrap_or_else(|| profile.display_name()),
             full_name: if profile.name.is_empty() {
                 profile.display_name()

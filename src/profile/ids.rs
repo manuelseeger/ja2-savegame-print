@@ -14,6 +14,21 @@ pub struct StockProfile {
     pub profile_type: StockProfileType,
 }
 
+/// Carmen's targets, from `g_terrorist_infos` in Tactical/Soldier_Profile.cc
+/// at the pinned Stracciatella revision. These names identify their dossiers;
+/// saved names and nicknames can be cover identities.
+pub fn terrorist_name(id: u8) -> Option<&'static str> {
+    match id {
+        64 => Some("Slay"),
+        82 => Some("Matron"),
+        83 => Some("Imposter"),
+        110 => Some("Tiffany"),
+        111 => Some("Rexall"),
+        112 => Some("Elgin"),
+        _ => None,
+    }
+}
+
 pub fn stock_npc_or_rpc(id: u8) -> Option<StockProfile> {
     let (canonical_name, profile_type) = match id {
         57 => ("MIGUEL", StockProfileType::Rpc),
