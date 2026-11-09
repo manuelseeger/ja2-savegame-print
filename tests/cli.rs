@@ -248,6 +248,7 @@ fn items_without_include_shows_all_and_rod_is_an_alias() {
     let all_text = String::from_utf8_lossy(&all.stdout);
     assert!(all_text.starts_with(String::from_utf8_lossy(&rod.stdout).as_ref()));
     assert!(all_text.contains("Spring (item 306)"));
+    assert!(all_text.contains("FN P90 (item 15)"));
 
     let all_json = binary()
         .args([FIXTURE, "items", "--json"])
@@ -255,8 +256,8 @@ fn items_without_include_shows_all_and_rod_is_an_alias() {
         .expect("CLI should run");
     assert!(all_json.status.success());
     let document: serde_json::Value = serde_json::from_slice(&all_json.stdout).unwrap();
-    assert_eq!(document["items"].as_array().unwrap().len(), 7);
-    for (index, id) in [305, 306, 315, 308, 318, 319, 316].iter().enumerate() {
+    assert_eq!(document["items"].as_array().unwrap().len(), 8);
+    for (index, id) in [305, 306, 315, 308, 318, 319, 316, 15].iter().enumerate() {
         assert_eq!(document["items"][index]["item_index"], *id);
     }
 }
@@ -292,6 +293,84 @@ fn spring_locations_are_available_as_text_and_json() {
     assert!(locations
         .iter()
         .all(|location| location.get("found").is_some()));
+}
+
+#[test]
+fn p90_aliases_show_map_placements_as_text_and_json() {
+    for alias in ["p90", "fn-p90", "P90", "FN_P90", " Fn P90 ", "fN-p_90"] {
+        let output = binary()
+            .args([FIXTURE, "items", "-i", alias, "--json"])
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{alias}: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let document: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(document["item"]["name"], "FN P90");
+        assert_eq!(document["item"]["internal_name"], "P90");
+        assert_eq!(document["item"]["item_index"], 15);
+        let placements = document["item"]["locations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|location| !location["count"].is_null())
+            .collect::<Vec<_>>();
+        assert_eq!(placements.len(), 2);
+        for (location, chance) in placements.iter().zip([20, 50]) {
+            assert_eq!(location["sector"]["name"], "M9");
+            assert_eq!(location["count"], 1);
+            assert_eq!(location["absent_chance_percent"], chance);
+            assert!(location.get("found").is_some());
+        }
+    }
+    let output = binary()
+        .args([FIXTURE, "items", "-i", "fn-p90"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let text = String::from_utf8(output.stdout).unwrap();
+    assert!(text.starts_with("FN P90 (item 15)\n"));
+    let placements = text
+        .lines()
+        .filter(|line| line.starts_with("M9 "))
+        .map(|line| line.split_whitespace().take(3).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    assert_eq!(placements, [vec!["M9", "1", "20%"], vec!["M9", "1", "50%"]]);
+}
+
+#[test]
+fn item_help_and_unknown_item_error_list_supported_items() {
+    let help = binary()
+        .args([FIXTURE, "items", "--help"])
+        .output()
+        .unwrap();
+    assert!(help.status.success());
+    let error = binary()
+        .args([FIXTURE, "items", "-i", "unknown"])
+        .output()
+        .unwrap();
+    assert!(!error.status.success());
+    for item in [
+        "aluminum-rod",
+        "spring",
+        "lame-boy",
+        "steel-rod",
+        "fumble-pak",
+        "x-ray-bulb",
+        "copper-wire",
+        "fn-p90 (p90)",
+    ] {
+        assert!(
+            String::from_utf8_lossy(&help.stdout).contains(item),
+            "{item}"
+        );
+        assert!(
+            String::from_utf8_lossy(&error.stderr).contains(item),
+            "{item}"
+        );
+    }
 }
 
 #[test]
