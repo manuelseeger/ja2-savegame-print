@@ -186,6 +186,9 @@ fn analyze_bytes_exposes_known_empty_and_unknown_sector_counts() {
     let (tail, _) = suffix(&item_file(&[
         item(true, 305, 5, -1),
         item(false, 305, 8, 1),
+        item(true, 15, 2, -1),
+        item(true, 15, 1, 1),
+        item(false, 15, 8, 1),
     ]));
     let mut bytes = fixture[..soldier_end].to_vec();
     bytes.extend(tail);
@@ -233,6 +236,44 @@ fn analyze_bytes_exposes_known_empty_and_unknown_sector_counts() {
         assert_eq!(found("B4-2"), 2);
         assert_eq!(found("A1-1"), 3);
         assert!(found("C5").is_null());
+
+        let p90 = crate::item::lookup("fn-p90").unwrap();
+        let mut output = Vec::new();
+        crate::output::write_output(
+            &analysis,
+            &crate::output::OutputOptions {
+                json: true,
+                pretty: false,
+                all_profiles: false,
+                list_npcs: false,
+                item: Some(&p90),
+                items: None,
+                include: &[],
+                exclude: &[],
+            },
+            &mut output,
+        )
+        .unwrap();
+        let document: serde_json::Value = serde_json::from_slice(&output).unwrap();
+        assert_eq!(document["item"]["item_index"], 15);
+        let locations = document["item"]["locations"].as_array().unwrap();
+        let a1 = locations
+            .iter()
+            .find(|location| location["sector"]["name"] == "A1")
+            .unwrap();
+        assert_eq!(a1["found"], 3);
+        assert!(a1["count"].is_null());
+        assert!(a1["absent_chance_percent"].is_null());
+        assert_eq!(locations.len(), 3);
+        for location in &locations[..2] {
+            assert_eq!(location["sector"]["name"], "M9");
+            assert!(location["found"].is_null());
+        }
+        assert_eq!(
+            analysis.sector_item_count(&Sector::new(2, 1, 0), 15),
+            Some(0)
+        );
+        assert_eq!(analysis.sector_item_count(&Sector::new(3, 1, 0), 15), None);
     }
 }
 

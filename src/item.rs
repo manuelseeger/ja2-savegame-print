@@ -27,6 +27,7 @@ pub fn all() -> Vec<Item> {
         fumble_pak(),
         xray_bulb(),
         copper_wire(),
+        p90(),
     ]
 }
 
@@ -44,6 +45,7 @@ pub fn lookup(name: &str) -> Option<Item> {
         "fumblepak" => Some(fumble_pak()),
         "xraybulb" => Some(xray_bulb()),
         "copperwire" => Some(copper_wire()),
+        "p90" | "fnp90" => Some(p90()),
         _ => None,
     }
 }
@@ -130,6 +132,11 @@ fn copper_wire() -> Item {
     item("Copper wire", "COPPER_WIRE", 316, &placements)
 }
 
+fn p90() -> Item {
+    let m9_alternate_cache_placements = [(9, 13, 0, 1, 20), (9, 13, 0, 1, 50)];
+    item("FN P90", "P90", 15, &m9_alternate_cache_placements)
+}
+
 fn item(
     name: &'static str,
     internal_name: &'static str,
@@ -212,6 +219,7 @@ mod tests {
     fn component_locations_match_original_maps() {
         let cases = [
             ("LAME_BOY", 315, vec![]),
+            ("P90", 15, vec![(9, 13, 0, 1, 20), (9, 13, 0, 1, 50)]),
             (
                 "STEEL_ROD",
                 308,
@@ -274,6 +282,7 @@ mod tests {
             (["Fumble pak", "FUMBLE_PAK", "fumble-pak"], 318),
             (["X-ray bulb", "XRAY_BULB", "x_ray-bulb"], 319),
             (["Copper wire", "COPPER_WIRE", "copper-wire"], 316),
+            (["p90", "FN-P90", " fn_p90 "], 15),
         ] {
             for name in names {
                 assert_eq!(lookup(name).unwrap().item_index, id, "{name}");
@@ -286,7 +295,7 @@ mod tests {
         let items = super::all();
         assert_eq!(
             items.iter().map(|item| item.item_index).collect::<Vec<_>>(),
-            vec![305, 306, 315, 308, 318, 319, 316]
+            vec![305, 306, 315, 308, 318, 319, 316, 15]
         );
     }
 }
